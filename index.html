@@ -168,9 +168,9 @@ async function init(){
   sb.auth.onAuthStateChange((_event,session)=>{admin=!!session;render()});
 }
 function render(){
-  applyMode();const imp=imps[est],cur=items.filter(i=>i.estoque===est&&(admin||i.ativo!==false)),tot=cur.length,dp=cur.filter(disp).length;
+  applyMode();const imp=imps[est],cur=items.filter(i=>i.estoque===est&&(admin?true:disp(i))),tot=cur.length,dp=cur.filter(disp).length;
   const st=(v,l,c="",k="")=>admin&&k&&Number(v)>0?`<button class="st ${c} clk" data-l="${k}"><b>${v}</b><span>${l} ›</span></button>`:`<div class="st ${c}"><b>${v}</b><span>${l}</span></div>`;
-  $("#stats").innerHTML=st(tot,admin?"Itens neste almoxarifado":"Itens no catálogo")+st(dp,"Disponíveis","g")+st(tot-dp,"Indisponíveis","r")+(admin?st(imp?imp.novos:"–","Novos na última importação","g","n")+st(imp?imp.novos+(imp.reab||0):"–","Entradas: novos ou reabastecidos","g","e")+st(imp?imp.zerados:"–","Zeraram na última importação","r","z")+st(imp?imp.alterados:"–","Itens alterados","","a"):"");
+  $("#stats").innerHTML=st(tot,admin?"Itens neste almoxarifado":"Itens no catálogo")+st(dp,"Disponíveis","g")+(admin?st(tot-dp,"Indisponíveis","r")+st(imp?imp.novos:"–","Novos na última importação","g","n")+st(imp?imp.novos+(imp.reab||0):"–","Entradas: novos ou reabastecidos","g","e")+st(imp?imp.zerados:"–","Zeraram na última importação","r","z")+st(imp?imp.alterados:"–","Itens alterados","","a"):"");
   $("#last").textContent=!imp?"Nenhuma importação realizada ainda":admin?`Última importação: ${new Date(imp.data).toLocaleString("pt-BR")} · ${imp.arquivo||""} · ${imp.total} linhas`:`Atualizado em ${new Date(imp.data).toLocaleString("pt-BR")}`;
   const t=term.toLowerCase();const l=cur.filter(i=>{if(t&&!`${i.nome} ${i.codigo} ${i.descricao}`.toLowerCase().includes(t))return false;if(filt==="disp")return disp(i);if(filt==="indisp")return !disp(i)&&i.ativo!==false;if(filt==="desat")return i.ativo===false;return true});
   if(!l.length){$("#list").innerHTML=`<div class="empty">${cur.length?"Nenhum item encontrado.":"Catálogo vazio. Importe a planilha para começar."}</div>`;return}
@@ -193,7 +193,16 @@ const det=i=>{const d=[];if(i.novo)d.push(`Item novo · quantidade: ${Number(i.q
 $("#stats").addEventListener("click",e=>{const b=e.target.closest("[data-l]");if(!b||!admin)return;const k=b.dataset.l,imp=imps[est];if(!imp)return;const l=items.filter(i=>i.estoque===est&&i.imp===imp.data&&(k==="n"?i.novo===true:k==="e"?(i.novo===true||i.rep===true):k==="z"?i.zer===true:i.novo===false));const tit=`${LT[k]} na última importação — Almoxarifado ${NOMES[est]} (${l.length})`,sub=`Almoxarifado ${NOMES[est]} · Importação de ${new Date(imp.data).toLocaleString("pt-BR")} · Emitido em ${new Date().toLocaleString("pt-BR")}`;relat={k,tit,sub,l};$("#lt").textContent=tit;$("#lb").innerHTML=l.length?l.map(i=>`<div class="lr"><span class="cod">${esc(i.codigo)}</span><div><b>${esc(i.nome)}</b><div class="dt">${esc(det(i))}</div></div></div>`).join(""):'<div class="empty">A lista detalhada fica disponível a partir da próxima importação feita com esta versão.</div>';$("#ph").innerHTML=`<div class="pl"><img src="${document.querySelector("header img").src}" width="56" height="56" alt=""><div><b>FUMEC — Fundação Municipal para Educação Comunitária</b><br>${esc(sub)}</div></div>Total de itens: <b>${l.length}</b>`;$("#lst").classList.add("on")});
 $("#lp").onclick=()=>{if(!relat||!relat.l.length)return toast("Não há itens para imprimir.");window.print()};
 $("#lc").onclick=()=>$("#lst").classList.remove("on");
-function applyMode(){["#upimg","#up",".hint",'[data-f="desat"]'].forEach(q=>document.querySelectorAll(q).forEach(e=>e.style.display=admin?"":"none"));$("#adm").textContent=admin?"Sair do modo admin":"🔒 Administrador";if(!admin&&filt==="desat"){filt="todos";document.querySelectorAll(".tabs button").forEach(x=>x.classList.toggle("on",x.dataset.f==="todos"))}}
+function applyMode(){
+  ["#upimg","#up",".hint",'[data-f="desat"]','[data-f="indisp"]'].forEach(q=>
+    document.querySelectorAll(q).forEach(e=>e.style.display=admin?"":"none")
+  );
+  $("#adm").textContent=admin?"Sair do modo admin":"🔒 Administrador";
+  if(!admin&&(filt==="desat"||filt==="indisp")){
+    filt="todos";
+    document.querySelectorAll(".tabs button").forEach(x=>x.classList.toggle("on",x.dataset.f==="todos"));
+  }
+}
 $("#adm").onclick=async()=>{if(admin){await sb.auth.signOut();return}$("#pt").textContent="Acesso do administrador";$("#pl").textContent="E-mail";$("#po").textContent="Entrar";$("#pi").type="email";$("#pi").value="";$("#pw").classList.add("on");$("#pi").focus()};
 $("#pc").onclick=()=>$("#pw").classList.remove("on");
 $("#pi").onkeydown=e=>{if(e.key==="Enter")$("#po").click()};

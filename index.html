@@ -183,9 +183,12 @@ async function importCsv(file){
   try{
     const {data:{session}}=await sb.auth.getSession();
     if(!session){toast("Sua sessão de administrador não está ativa. Faça login novamente.",12000);return}
-    const buf=await file.arrayBuffer(),u=new Uint8Array(buf);let rows;
+
+    const buf=await file.arrayBuffer(),u=new Uint8Array(buf);
+    let rows;
     const isBin=(u[0]===0x50&&u[1]===0x4B)||(u[0]===0xD0&&u[1]===0xCF);
     const dec=()=>{try{return new TextDecoder("utf-8",{fatal:true}).decode(buf)}catch{return new TextDecoder("windows-1252").decode(buf)}};
+
     if(isBin){
       if(!window.XLSX)throw new Error("Biblioteca de planilhas não carregou. Recarregue a página e tente novamente.");
       const wb=XLSX.read(buf,{type:"array",codepage:1252});
@@ -198,51 +201,143 @@ async function importCsv(file){
         rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:"",raw:true});
       }else rows=parseCsv(txt);
     }
+
     rows=rows.map(r=>r.map(c=>String(c??""))).filter(r=>r.some(x=>x.trim()));
+    const linhasPlanilha=rows.length-1;
     if(rows.length<2){toast("Planilha vazia ou sem linhas de dados.",9000);return}
+
     const h=rows.shift().map(norm),col=al=>h.findIndex(x=>al.includes(x));
-    const iC=col(["codreduzido","codigo","cod","sku"]),iN=col(["descrproduto","nome","produto","item"]),iQ=col(["qtatual","quantidade","qtd","qtde","estoque","saldo"]),iU=col(["unidade"]),iA=col(["nomealmox","almoxarifado"]);
-    if(iN<0||iC<0||(iA<0&&iU<0)){toast("A planilha precisa ter as colunas COD_REDUZIDO, DESCR_PRODUTO e NOME_ALMOX.",12000);return}
-    const csv={central:new Map(),ceprocamp:new Map()},ign=new Set();
-    for(const r of rows){
-      const k=(iA>=0?stockOf(r[iA]):null)||(iU>=0?stockOf(r[iU]):null);
-      if(!k){ign.add(((iA>=0?r[iA]:r[iU])||"(vazio)").trim());continue}
-      const cod=String(r[iC]??"").trim();if(!cod)continue;
-      const q=iQ>=0?num(r[iQ]):null,p=csv[k].get(cod);
-      if(p){if(q!==null)p.quantidade=(p.quantidade||0)+q;continue}
-      csv[k].set(cod,{codigo:cod,nome:String(r[iN]??"").trim(),quantidade:q})
+    const iC=col(["codreduzido","codigo","cod","sku"]);
+    const iN=col(["descrproduto","nome","produto","item"]);
+    const iQ=col(["qtatual","quantidade","qtd","qtde","estoque","saldo"]);
+    const iA=col(["nomealmox","almoxarifado"]);
+
+    if(iN<0||iC<0||iA<0){
+      toast("A planilha precisa ter as colunas COD_REDUZIDO, DESCR_PRODUTO e NOME_ALMOX.",12000);
+      return;
     }
-    if(!csv.central.size&&!csv.ceprocamp.size){toast(ign.size?`Nenhuma linha reconhecida. Valores de almoxarifado encontrados: ${[...ign].slice(0,5).join(", ")}`:"Nenhum item reconhecido na planilha.",12000);return}
+
+    const grupos={central:new Map(),ceprocamp:new Map()},ignoradas=[];
+    for(const r of rows){
+      const almox=String(r[iA]??"").trim();
+      const k=stockOf(almox);
+      if(!k){ignoradas.push({almox,codigo:String(r[iC]??"").trim()});continue}
+
+      const cod=String(r[iC]??"").trim();
+      if(!cod){ignoradas.push({almox,codigo:"(sem código)"});continue}
+
+      const nome=String(r[iN]??"").trim();
+      const quantidade=iQ>=0?num(r[iQ]):0;
+
+      // Se o mesmo código aparecer duas vezes no mesmo almoxarifado,
+      // somamos as quantidades, em vez de perder uma das linhas.
+      const existente=grupos[k].get(cod);
+      if(existente) existente.quantidade+=quantidade;
+      else grupos[k].set(cod,{codigo:cod,nome:nome||cod,quantidade});
+    }
+
+    const reconhecidas=grupos.central.size+grupos.ceprocamp.size;
+    if(!reconhecidas){
+      const exemplos=ignoradas.slice(0,5).map(x=>x.almox||"(vazio)").join(", ");
+      toast(`Nenhum item reconhecido. Valores de NOME_ALMOX encontrados: ${exemplos||"(nenhum)"}`,12000);
+      return;
+    }
+
+    toast(`Planilha lida: ${linhasPlanilha} linha(s). ${reconhecidas} item(ns) reconhecido(s). Gravando no banco…`,60000);
+
     const stamp=new Date().toISOString();
-    let totalOps=0;
+    let totalGravadas=0,novosTotal=0,alteradosTotal=0,semMudancaTotal=0,zeradosTotal=0,reabTotal=0;
+    const erros=[];
+
     for(const k of ["central","ceprocamp"]){
-      if(!csv[k].size)continue;
-      const ex=new Map(items.filter(i=>i.estoque===k).map(i=>[i.codigo,i]));let novos=0,zerados=0,alterados=0,reab=0;
-      for(const [cod,n] of csv[k]){
-        const cur=ex.get(cod);
+      const lista=[...grupos[k].values()];
+      if(!lista.length)continue;
+
+      const existentes=new Map(items.filter(i=>i.estoque===k).map(i=>[String(i.codigo).trim(),i]));
+      const payload=[];
+
+      for(const n of lista){
+        const cur=existentes.get(n.codigo);
+        const q=Number(n.quantidade)||0;
+
         if(!cur){
-          novos++;totalOps++;
-          const {error}=await sb.from("itens").upsert({id:docId(k+"_"+cod),estoque:k,codigo:cod,nome:n.nome||cod,descricao:"",quantidade:n.quantidade??0,ativo:true,imagem:"",imp:stamp,novo:true,zer:false,rep:false,ant_nome:"",ant_qtd:-1},{onConflict:"id"});
-          if(error)throw error;
-          continue
-        }
-        const ch={};if(n.nome&&n.nome!==cur.nome)ch.nome=n.nome;if(n.quantidade!==null&&n.quantidade!==Number(cur.quantidade))ch.quantidade=n.quantidade;
-        if(Object.keys(ch).length){
-          alterados++;totalOps++;
-          const z=Number(cur.quantidade)>0&&ch.quantidade===0;if(z)zerados++;
-          const rp=(Number(cur.quantidade)||0)===0&&ch.quantidade>0;if(rp)reab++;
-          const {error}=await sb.from("itens").update({...ch,imp:stamp,novo:false,zer:z,rep:rp,ant_nome:"nome" in ch?cur.nome:"",ant_qtd:"quantidade" in ch?(Number(cur.quantidade)||0):-1}).eq("id",cur._id);
-          if(error)throw error;
+          novosTotal++;
+          payload.push({
+            id:docId(k+"_"+n.codigo),
+            estoque:k,
+            codigo:n.codigo,
+            nome:n.nome||n.codigo,
+            descricao:"",
+            quantidade:q,
+            ativo:true,
+            imagem:"",
+            imp:stamp,
+            novo:true,
+            zer:false,
+            rep:false,
+            ant_nome:"",
+            ant_qtd:-1
+          });
+        }else{
+          const antiga=Number(cur.quantidade)||0;
+          const nomeMudou=n.nome && n.nome!==cur.nome;
+          const qtdMudou=antiga!==q;
+          const z=antiga>0&&q===0;
+          const rp=antiga===0&&q>0;
+
+          if(nomeMudou||qtdMudou)alteradosTotal++;
+          else semMudancaTotal++;
+          if(z)zeradosTotal++;
+          if(rp)reabTotal++;
+
+          payload.push({
+            id:cur._id,
+            estoque:k,
+            codigo:n.codigo,
+            nome:nomeMudou?n.nome:cur.nome,
+            descricao:cur.descricao||"",
+            quantidade:q,
+            ativo:cur.ativo!==false,
+            imagem:cur.imagem||"",
+            imp:stamp,
+            novo:false,
+            zer:z,
+            rep:rp,
+            ant_nome:nomeMudou?cur.nome:"",
+            ant_qtd:qtdMudou?antiga:-1
+          });
         }
       }
-      const rec={estoque:k,data:stamp,arquivo:file.name,total:csv[k].size,novos,zerados,alterados,reab};
-      const {error}=await sb.from("importacoes").upsert(rec,{onConflict:"estoque"});
-      if(error)throw error;
+
+      // Envia em lotes para não fazer centenas de requisições individuais.
+      for(let i=0;i<payload.length;i+=200){
+        const lote=payload.slice(i,i+200);
+        toast(`Gravando ${Math.min(i+lote.length,payload.length)}/${payload.length} itens do ${k==="central"?"Central":"Ceprocamp"}…`,60000);
+        const {error}=await sb.from("itens").upsert(lote,{onConflict:"estoque,codigo"});
+        if(error)throw error;
+        totalGravadas+=lote.length;
+      }
+
+      const rec={
+        estoque:k,
+        data:stamp,
+        arquivo:file.name,
+        total:lista.length,
+        novos:[...lista].filter(n=>!existentes.has(n.codigo)).length,
+        zerados:zeradosTotal,
+        alterados:alteradosTotal,
+        reab:reabTotal
+      };
+      const {error:ie}=await sb.from("importacoes").upsert(rec,{onConflict:"estoque"});
+      if(ie)throw ie;
     }
+
     await loadData();
-    let msg=`Importação concluída: ${totalOps} alteração(ões).`;
-    if(ign.size)msg+=` ${ign.size} valor(es) de almoxarifado ignorado(s): ${[...ign].slice(0,4).join(", ")}.`;
-    toast(msg,12000);
+
+    let msg=`Importação concluída: ${totalGravadas} item(ns) gravado(s) de ${linhasPlanilha} linha(s) da planilha.`;
+    msg+=` ${novosTotal} novo(s), ${alteradosTotal} alterado(s), ${semMudancaTotal} sem mudança.`;
+    if(ignoradas.length)msg+=` ${ignoradas.length} linha(s) ignorada(s).`;
+    toast(msg,20000);
   }catch(e){
     console.error("Erro na importação:",e);
     toast("Erro na importação: "+(e.message||e.code||String(e)),18000);

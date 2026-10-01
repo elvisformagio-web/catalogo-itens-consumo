@@ -113,261 +113,97 @@ header #up{background:var(--acc);border-color:var(--acc);color:#1b1f24;font-weig
 <input type="file" id="imgin" accept="image/*" hidden>
 <div id="toast"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
 const $=s=>document.querySelector(s);
-const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-let db=null,assets=null,items=[],imps={},est="central",admin=false,cfg=undefined,filt="todos",term="",editId=null,delId=null,editMode="",imgId=null;
-
+const esc=s=>String(s??"").replace(/[&<>\"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const SUPABASE_URL="https://arkmnzmzhimgtrdiygcf.supabase.co";
+const SUPABASE_KEY="sb_publishable_O7Ez-YYc_sC_Mny0YndeZQ_ZN_DpYA6";
+const {createClient}=window.supabase;
+const sb=createClient(SUPABASE_URL,SUPABASE_KEY);
+let items=[],imps={},est="central",admin=false,filt="todos",term="",editId=null,delId=null,editMode="",imgId=null,relat=null;
 function toast(m,ms=4500){const t=$("#toast");t.textContent=m;t.style.display="block";clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.display="none",ms)}
 const ph=n=>"data:image/svg+xml;utf8,"+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><rect width="400" height="300" fill="#c9ced6"/><text x="200" y="175" font-size="90" text-anchor="middle" fill="#8a919c" font-family="sans-serif">${esc((n||"?").trim()[0]||"?").toUpperCase()}</text></svg>`);
 const docId=c=>String(c).replace(/[^A-Za-z0-9_-]/g,"_").slice(0,150);
 const disp=i=>i.ativo!==false&&Number(i.quantidade)>0;
-
+async function loadData(){
+  const [{data:it,error:ie},{data:im,error:me}]=await Promise.all([sb.from("itens").select("*"),sb.from("importacoes").select("*")]);
+  if(ie)throw ie;if(me)throw me;
+  items=(it||[]).map(x=>({_id:x.id,...x})).sort((a,b)=>String(a.nome).localeCompare(String(b.nome),"pt-BR"));
+  imps={};(im||[]).forEach(x=>imps[x.estoque]=x);render();
+}
 async function init(){
-  try{db=await window.claude?.use("db");assets=await window.claude?.use("assets")}catch(e){}
-  if(!db){$("#list").innerHTML='<div class="empty">Banco de dados indisponível nesta visualização. Abra o artefato pelo link do claude.ai com sua conta.</div>';$("#up").disabled=true;return}
-  if(!assets)toast("Troca de imagens indisponível para o seu perfil.");
-  db.collection("itens").onSnapshot(s=>{items=s.docs.map(d=>({_id:d.id,...d.data()}));items.sort((a,b)=>String(a.nome).localeCompare(String(b.nome),"pt-BR"));render()},e=>toast("Erro ao ler dados: "+e.message));
-  db.doc("config/admin").onSnapshot(s=>{cfg=s.exists?s.data():null;
-    try{if(cfg&&sessionStorage.getItem("adm")===cfg.hash&&!admin){admin=true;render()}}catch(e){}},()=>{cfg=null});
-  ["central","ceprocamp"].forEach(k=>db.doc("meta/importacao_"+k).onSnapshot(s=>{imps[k]=s.exists?s.data():null;render()}));
-}
-
-function render(){
+  try{const {data:{session}}=await sb.auth.getSession();admin=!!session}catch(e){admin=false}
   applyMode();
-  const imp=imps[est],cur=items.filter(i=>i.estoque===est&&(admin||i.ativo!==false));
-  const tot=cur.length,dp=cur.filter(disp).length;
-  const st=(v,l,c="",k="")=>admin&&k&&v>0?`<button class="st ${c} clk" data-l="${k}"><b>${v}</b><span>${l} ›</span></button>`:`<div class="st ${c}"><b>${v}</b><span>${l}</span></div>`;
-  $("#stats").innerHTML=st(tot,admin?"Itens neste almoxarifado":"Itens no catálogo")+st(dp,"Disponíveis","g")+st(tot-dp,"Indisponíveis","r")+
-    (admin?st(imp?imp.novos:"–","Novos na última importação","g","n")+st(imp?imp.novos+(imp.reab||0):"–","Entradas: novos ou reabastecidos","g","e")+st(imp?imp.zerados:"–","Zeraram na última importação","r","z")+st(imp?imp.alterados:"–","Itens alterados","","a"):"");
-  $("#last").textContent=!imp?"Nenhuma importação realizada ainda":admin?`Última importação: ${new Date(imp.data).toLocaleString("pt-BR")} · ${imp.arquivo||""} · ${imp.total} linhas`:`Atualizado em ${new Date(imp.data).toLocaleString("pt-BR")}`;
-  const t=term.toLowerCase();
-  const l=cur.filter(i=>{
-    if(t&&!`${i.nome} ${i.codigo} ${i.descricao}`.toLowerCase().includes(t))return false;
-    if(filt==="disp")return disp(i);
-    if(filt==="indisp")return !disp(i)&&i.ativo!==false;
-    if(filt==="desat")return i.ativo===false;
-    return true});
-  if(!l.length){$("#list").innerHTML=`<div class="empty">${cur.length?"Nenhum item encontrado.":"Catálogo vazio. Importe a planilha para começar."}</div>`;return}
-  $("#list").innerHTML='<div class="grid">'+l.map(i=>{
-    const d=disp(i),off=i.ativo===false;
-    return `<div class="card ${off?"off":""}"><div class="img"><img loading="lazy" src="${esc(i.imagem||ph(i.nome))}" alt="" onerror="this.src='${ph(i.nome)}'">
-    <span class="tag ${d?"ok":"no"}">${d?"Disponível":"Indisponível"}</span>${off&&admin?'<span class="tag dz">Desativado</span>':""}</div>
-    <div class="body"><div class="cod">${esc(i.codigo)}</div><div class="nm">${esc(i.nome)}</div><div class="ds">${esc(i.descricao)||"Sem descrição"}</div>${admin?`<div class="qt">Quantidade: <b>${Number(i.quantidade)||0}</b></div>`:""}</div>
-    ${admin?`<div class="act" data-id="${esc(i._id)}"><button data-a="tog">${off?"Ativar":"Desativar"}</button><button data-a="qtd">Alterar qtd.</button><button data-a="img">Alterar imagem</button><button data-a="edit">Editar</button><button data-a="del" class="dng">Excluir item</button></div>`:""}</div>`}).join("")+"</div>";
+  try{await loadData()}catch(e){$("#list").innerHTML=`<div class="empty">Não foi possível carregar o banco de dados: ${esc(e.message||e)}</div>`;toast("Erro ao carregar o catálogo.")}
+  sb.channel("catalogo-itens").on("postgres_changes",{event:"*",schema:"public",table:"itens"},()=>loadData().catch(()=>{})).on("postgres_changes",{event:"*",schema:"public",table:"importacoes"},()=>loadData().catch(()=>{})).subscribe();
+  sb.auth.onAuthStateChange((_event,session)=>{admin=!!session;render()});
 }
-
-async function upd(id,data,msg){try{await db.doc("itens/"+id).update(data);if(msg)toast(msg)}catch(e){toast("Não foi possível salvar: "+(e.message||e.code))}}
-
-$("#list").addEventListener("click",e=>{
-  const b=e.target.closest("button[data-a]");if(!b)return;
-  const id=b.parentElement.dataset.id,it=items.find(x=>x._id===id);if(!it)return;
-  const a=b.dataset.a;
-  if(a==="tog")upd(id,{ativo:it.ativo===false},it.ativo===false?"Item ativado":"Item desativado");
-  else if(a==="img"){if(!assets)return toast("Upload de imagem indisponível.");imgId=id;$("#imgin").click()}
-  else if(a==="del"){delId=id;$("#dn").textContent=`${it.codigo} — ${it.nome}`;$("#dl").classList.add("on")}
-  else openMod(it,a);
-});
-$("#imgin").onchange=async e=>{
-  const f=e.target.files[0];e.target.value="";if(!f||!imgId)return;
-  try{toast("Enviando imagem…");const r=await assets.upload(f);await upd(imgId,{imagem:r.url},"Imagem atualizada")}catch(x){toast("Falha no upload: "+(x.message||x.code))}
-};
-function openMod(it,mode){editId=it._id;editMode=mode;$("#mt").textContent=mode==="qtd"?"Alterar quantidade — "+it.nome:"Editar item";
-  $("#fn").style.display=$("#fd").style.display=mode==="qtd"?"none":"block";
-  $("#mn").value=it.nome||"";$("#md").value=it.descricao||"";$("#mq").value=Number(it.quantidade)||0;$("#ovl").classList.add("on");$("#mq").focus()}
+function render(){
+  applyMode();const imp=imps[est],cur=items.filter(i=>i.estoque===est&&(admin||i.ativo!==false)),tot=cur.length,dp=cur.filter(disp).length;
+  const st=(v,l,c="",k="")=>admin&&k&&Number(v)>0?`<button class="st ${c} clk" data-l="${k}"><b>${v}</b><span>${l} ›</span></button>`:`<div class="st ${c}"><b>${v}</b><span>${l}</span></div>`;
+  $("#stats").innerHTML=st(tot,admin?"Itens neste almoxarifado":"Itens no catálogo")+st(dp,"Disponíveis","g")+st(tot-dp,"Indisponíveis","r")+(admin?st(imp?imp.novos:"–","Novos na última importação","g","n")+st(imp?imp.novos+(imp.reab||0):"–","Entradas: novos ou reabastecidos","g","e")+st(imp?imp.zerados:"–","Zeraram na última importação","r","z")+st(imp?imp.alterados:"–","Itens alterados","","a"):"");
+  $("#last").textContent=!imp?"Nenhuma importação realizada ainda":admin?`Última importação: ${new Date(imp.data).toLocaleString("pt-BR")} · ${imp.arquivo||""} · ${imp.total} linhas`:`Atualizado em ${new Date(imp.data).toLocaleString("pt-BR")}`;
+  const t=term.toLowerCase();const l=cur.filter(i=>{if(t&&!`${i.nome} ${i.codigo} ${i.descricao}`.toLowerCase().includes(t))return false;if(filt==="disp")return disp(i);if(filt==="indisp")return !disp(i)&&i.ativo!==false;if(filt==="desat")return i.ativo===false;return true});
+  if(!l.length){$("#list").innerHTML=`<div class="empty">${cur.length?"Nenhum item encontrado.":"Catálogo vazio. Importe a planilha para começar."}</div>`;return}
+  $("#list").innerHTML='<div class="grid">'+l.map(i=>{const d=disp(i),off=i.ativo===false;return `<div class="card ${off?"off":""}"><div class="img"><img loading="lazy" src="${esc(i.imagem||ph(i.nome))}" alt="" onerror="this.src='${ph(i.nome)}'"><span class="tag ${d?"ok":"no"}">${d?"Disponível":"Indisponível"}</span>${off&&admin?'<span class="tag dz">Desativado</span>':""}</div><div class="body"><div class="cod">${esc(i.codigo)}</div><div class="nm">${esc(i.nome)}</div><div class="ds">${esc(i.descricao)||"Sem descrição"}</div>${admin?`<div class="qt">Quantidade: <b>${Number(i.quantidade)||0}</b></div>`:""}</div>${admin?`<div class="act" data-id="${esc(i._id)}"><button data-a="tog">${off?"Ativar":"Desativar"}</button><button data-a="qtd">Alterar qtd.</button><button data-a="img">Alterar imagem</button><button data-a="edit">Editar</button><button data-a="del" class="dng">Excluir item</button></div>`:""}</div>`}).join("")+"</div>";
+}
+async function upd(id,data,msg){try{const {error}=await sb.from("itens").update(data).eq("id",id);if(error)throw error;if(msg)toast(msg);await loadData()}catch(e){toast("Não foi possível salvar: "+(e.message||e.code))}}
+$("#list").addEventListener("click",e=>{const b=e.target.closest("button[data-a]");if(!b)return;const id=b.parentElement.dataset.id,it=items.find(x=>x._id===id);if(!it)return;const a=b.dataset.a;if(a==="tog")upd(id,{ativo:it.ativo===false},it.ativo===false?"Item ativado":"Item desativado");else if(a==="img"){imgId=id;$("#imgin").click()}else if(a==="del"){delId=id;$("#dn").textContent=`${it.codigo} — ${it.nome}`;$("#dl").classList.add("on")}else openMod(it,a)});
+$("#imgin").onchange=async e=>{const f=e.target.files[0];e.target.value="";if(!f||!imgId)return;try{toast("Enviando imagem…");const path=`${imgId}/${Date.now()}-${f.name.replace(/[^A-Za-z0-9._-]/g,"_")}`;const {error}=await sb.storage.from("imagens").upload(path,f,{upsert:true});if(error)throw error;const {data}=sb.storage.from("imagens").getPublicUrl(path);await upd(imgId,{imagem:data.publicUrl},"Imagem atualizada")}catch(x){toast("Falha no upload: "+(x.message||x.code))}};
+function openMod(it,mode){editId=it._id;editMode=mode;$("#mt").textContent=mode==="qtd"?"Alterar quantidade — "+it.nome:"Editar item";$("#fn").style.display=$("#fd").style.display=mode==="qtd"?"none":"block";$("#mn").value=it.nome||"";$("#md").value=it.descricao||"";$("#mq").value=Number(it.quantidade)||0;$("#ovl").classList.add("on");$("#mq").focus()}
 $("#dc").onclick=()=>$("#dl").classList.remove("on");
-$("#dok").onclick=async()=>{$("#dl").classList.remove("on");
-  try{await db.doc("itens/"+delId).delete();toast("Item excluído.")}catch(e){toast("Não foi possível excluir: "+(e.message||e.code))}};
+$("#dok").onclick=async()=>{$("#dl").classList.remove("on");try{const {error}=await sb.from("itens").delete().eq("id",delId);if(error)throw error;toast("Item excluído.");await loadData()}catch(e){toast("Não foi possível excluir: "+(e.message||e.code))}};
 $("#mc").onclick=()=>$("#ovl").classList.remove("on");
-$("#ms").onclick=async()=>{
-  const q=Math.max(0,parseFloat($("#mq").value)||0),d={quantidade:q};
-  if(editMode==="edit"){d.nome=$("#mn").value.trim()||"Sem nome";d.descricao=$("#md").value.trim()}
-  $("#ovl").classList.remove("on");await upd(editId,d,"Item atualizado");
-};
+$("#ms").onclick=async()=>{const q=Math.max(0,parseFloat($("#mq").value)||0),d={quantidade:q};if(editMode==="edit"){d.nome=$("#mn").value.trim()||"Sem nome";d.descricao=$("#md").value.trim()}$("#ovl").classList.remove("on");await upd(editId,d,"Item atualizado")};
 $("#q").oninput=e=>{term=e.target.value;render()};
 document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>{filt=b.dataset.f;document.querySelectorAll(".tabs button").forEach(x=>x.classList.toggle("on",x===b));render()});
-
 document.querySelectorAll("#stk button").forEach(b=>b.onclick=()=>{est=b.dataset.s;document.querySelectorAll("#stk button").forEach(x=>x.classList.toggle("on",x===b));render()});
 const LT={e:"Entradas (novos ou reabastecidos)",n:"Itens novos",z:"Itens que zeraram",a:"Itens alterados"};
-let relat=null;
-const det=i=>{const d=[];
-  if(i.novo)d.push(`Item novo · quantidade: ${Number(i.quantidade)||0}`);
-  if(i.rep)d.push("Voltou ao estoque (estava zerado)");
-  if(i.antQtd>=0)d.push(`Quantidade: ${i.antQtd} → ${Number(i.quantidade)||0}`);
-  if(i.antNome)d.push(`Nome anterior: ${i.antNome}`);
-  return d.join("\n")};
-$("#stats").addEventListener("click",e=>{
-  const b=e.target.closest("[data-l]");if(!b||!admin)return;
-  const k=b.dataset.l,imp=imps[est];if(!imp)return;
-  const l=items.filter(i=>i.estoque===est&&i.imp===imp.data&&(k==="n"?i.novo===true:k==="e"?(i.novo===true||i.rep===true):k==="z"?i.zer===true:i.novo===false));
-  const tit=`${LT[k]} na última importação — Almoxarifado ${NOMES[est]} (${l.length})`;
-  const sub=`Almoxarifado ${NOMES[est]} · Importação de ${new Date(imp.data).toLocaleString("pt-BR")} · Emitido em ${new Date().toLocaleString("pt-BR")}`;
-  relat={k,tit,sub,l};
-  $("#lt").textContent=tit;
-  $("#lb").innerHTML=l.length?l.map(i=>`<div class="lr"><span class="cod">${esc(i.codigo)}</span><div><b>${esc(i.nome)}</b><div class="dt">${esc(det(i))}</div></div></div>`).join(""):
-    '<div class="empty">A lista detalhada fica disponível a partir da próxima importação feita com esta versão.</div>';
-  $("#ph").innerHTML=`<div class="pl"><img src="${document.querySelector("header img").src}" width="56" height="56" alt=""><div><b>FUMEC — Fundação Municipal para Educação Comunitária</b><br>${esc(sub)}</div></div>Total de itens: <b>${l.length}</b>`;
-  $("#lst").classList.add("on");
-});
-$("#lp").onclick=async()=>{
-  if(!relat||!relat.l.length)return toast("Não há itens para imprimir.");
-  const dl=await window.claude?.use("downloads").catch(()=>null);
-  if(!dl){try{window.print()}catch(e){toast("Impressão indisponível aqui. Use Ctrl+P com a lista aberta.",8000)}return}
-  const r=relat,logo=document.querySelector("header img").src;
-  const html=`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(r.tit)}</title><style>
-body{font:13px system-ui,Arial,sans-serif;margin:24px;color:#000}.h{display:flex;gap:12px;align-items:center;border-bottom:2px solid #000;padding-bottom:8px;margin-bottom:12px}
-h1{font-size:17px;margin:0 0 8px}table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #999;padding:5px 6px;text-align:left;vertical-align:top}th{background:#eee}tr{break-inside:avoid}td.d{white-space:pre-wrap}
-</style></head><body><div class="h"><img src="${logo}" width="56" height="56" alt=""><div><b>FUMEC — Fundação Municipal para Educação Comunitária</b><br>${esc(r.sub)}</div></div>
-<h1>${esc(r.tit)}</h1><table><thead><tr><th>Código</th><th>Item</th><th>Detalhe</th></tr></thead><tbody>${r.l.map(i=>`<tr><td>${esc(i.codigo)}</td><td>${esc(i.nome)}</td><td class="d">${esc(det(i))}</td></tr>`).join("")}</tbody></table>
-<script>window.onload=function(){setTimeout(function(){window.print()},400)}<`+`/script></body></html>`;
-  try{await dl.save({filename:`relatorio-${r.k}-${est}-${new Date().toISOString().slice(0,10)}.html`,data:html});toast("Relatório salvo. Abra o arquivo baixado: a janela de impressão abre sozinha.",9000)}
-  catch(e){if(e.code!=="declined")toast("Não foi possível salvar o relatório: "+(e.message||e.code),8000)}
-};
+const NOMES={central:"Central",ceprocamp:"Ceprocamp"};
+const det=i=>{const d=[];if(i.novo)d.push(`Item novo · quantidade: ${Number(i.quantidade)||0}`);if(i.rep)d.push("Voltou ao estoque (estava zerado)");if(Number(i.ant_qtd)>=0)d.push(`Quantidade: ${i.ant_qtd} → ${Number(i.quantidade)||0}`);if(i.ant_nome)d.push(`Nome anterior: ${i.ant_nome}`);return d.join("\n")};
+$("#stats").addEventListener("click",e=>{const b=e.target.closest("[data-l]");if(!b||!admin)return;const k=b.dataset.l,imp=imps[est];if(!imp)return;const l=items.filter(i=>i.estoque===est&&i.imp===imp.data&&(k==="n"?i.novo===true:k==="e"?(i.novo===true||i.rep===true):k==="z"?i.zer===true:i.novo===false));const tit=`${LT[k]} na última importação — Almoxarifado ${NOMES[est]} (${l.length})`,sub=`Almoxarifado ${NOMES[est]} · Importação de ${new Date(imp.data).toLocaleString("pt-BR")} · Emitido em ${new Date().toLocaleString("pt-BR")}`;relat={k,tit,sub,l};$("#lt").textContent=tit;$("#lb").innerHTML=l.length?l.map(i=>`<div class="lr"><span class="cod">${esc(i.codigo)}</span><div><b>${esc(i.nome)}</b><div class="dt">${esc(det(i))}</div></div></div>`).join(""):'<div class="empty">A lista detalhada fica disponível a partir da próxima importação feita com esta versão.</div>';$("#ph").innerHTML=`<div class="pl"><img src="${document.querySelector("header img").src}" width="56" height="56" alt=""><div><b>FUMEC — Fundação Municipal para Educação Comunitária</b><br>${esc(sub)}</div></div>Total de itens: <b>${l.length}</b>`;$("#lst").classList.add("on")});
+$("#lp").onclick=()=>{if(!relat||!relat.l.length)return toast("Não há itens para imprimir.");window.print()};
 $("#lc").onclick=()=>$("#lst").classList.remove("on");
-function applyMode(){
-  ["#upimg","#up",".hint",'[data-f="desat"]'].forEach(q=>document.querySelectorAll(q).forEach(e=>e.style.display=admin?"":"none"));
-  $("#adm").textContent=admin?"Sair do modo admin":"🔒 Administrador";
-  if(!admin&&filt==="desat"){filt="todos";document.querySelectorAll(".tabs button").forEach(x=>x.classList.toggle("on",x.dataset.f==="todos"))}
-}
-const sha=async t=>[...new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(t)))].map(x=>x.toString(16).padStart(2,"0")).join("");
-$("#adm").onclick=()=>{
-  if(admin){admin=false;try{sessionStorage.removeItem("adm")}catch(e){}return render()}
-  if(!db)return toast("Banco de dados indisponível nesta visualização. Abra o catálogo pelo link publicado no claude.ai.",9000);
-  if(cfg===undefined)return toast("Carregando configurações… tente novamente em instantes.");
-  $("#pt").textContent=cfg?"Acesso do administrador":"Definir senha do administrador";
-  $("#pl").textContent=cfg?"Senha":"Ainda não há senha. Crie uma (mínimo 6 caracteres):";
-  $("#po").textContent=cfg?"Entrar":"Salvar senha";$("#pi").value="";$("#pw").classList.add("on");$("#pi").focus()};
+function applyMode(){["#upimg","#up",".hint",'[data-f="desat"]'].forEach(q=>document.querySelectorAll(q).forEach(e=>e.style.display=admin?"":"none"));$("#adm").textContent=admin?"Sair do modo admin":"🔒 Administrador";if(!admin&&filt==="desat"){filt="todos";document.querySelectorAll(".tabs button").forEach(x=>x.classList.toggle("on",x.dataset.f==="todos"))}}
+$("#adm").onclick=async()=>{if(admin){await sb.auth.signOut();return}$("#pt").textContent="Acesso do administrador";$("#pl").textContent="E-mail";$("#po").textContent="Entrar";$("#pi").type="email";$("#pi").value="";$("#pw").classList.add("on");$("#pi").focus()};
 $("#pc").onclick=()=>$("#pw").classList.remove("on");
 $("#pi").onkeydown=e=>{if(e.key==="Enter")$("#po").click()};
-$("#po").onclick=async()=>{
-  const pw=$("#pi").value;
-  try{
-    if(!cfg){
-      if(pw.length<6)return toast("Use ao menos 6 caracteres.");
-      const salt=[...crypto.getRandomValues(new Uint8Array(8))].map(x=>x.toString(16).padStart(2,"0")).join("");
-      const hash=await sha(salt+pw);await db.doc("config/admin").set({salt,hash});cfg={salt,hash};
-    }else if(await sha(cfg.salt+pw)!==cfg.hash)return toast("Senha incorreta.");
-    admin=true;try{sessionStorage.setItem("adm",cfg.hash)}catch(e){}
-    $("#pw").classList.remove("on");render();toast("Modo administrador ativado.");
-  }catch(e){toast("Não foi possível concluir: "+(e.message||e.code))}
-};
-/* ---------- Importação CSV ---------- */
-function parseCsv(t){
-  const first=t.split(/\r?\n/)[0]||"";
-  const dl=[";",",","\t"].map(d=>[d,first.split(d).length]).sort((a,b)=>b[1]-a[1])[0][0];
-  const rows=[];let r=[],c="",q=false;
-  for(let i=0;i<t.length;i++){const ch=t[i];
-    if(q){if(ch=='"'){if(t[i+1]=='"'){c+='"';i++}else q=false}else c+=ch}
-    else if(ch=='"')q=true;
-    else if(ch===dl){r.push(c);c=""}
-    else if(ch=="\n"||ch=="\r"){if(ch=="\r"&&t[i+1]=="\n")i++;r.push(c);c="";if(r.some(x=>x.trim()))rows.push(r);r=[]}
-    else c+=ch}
-  r.push(c);if(r.some(x=>x.trim()))rows.push(r);return rows}
-const norm=s=>String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g,"");
-const num=s=>{s=String(s??"").trim().replace(/\s/g,"");if(!s)return 0;
-  if(s.includes(",")&&s.includes("."))s=s.replace(/\./g,"").replace(",",".");else if(s.includes(","))s=s.replace(",",".");
-  const n=parseFloat(s);return isNaN(n)?0:Math.max(0,n)};
+$("#po").onclick=async()=>{const email=$("#pi").value.trim();if(!email)return toast("Informe o e-mail.");const pass=prompt("Digite a senha do administrador:");if(pass===null)return;try{const {error}=await sb.auth.signInWithPassword({email,password:pass});if(error)throw error;$("#pw").classList.remove("on");toast("Modo administrador ativado.")}catch(e){toast("Login não realizado: "+(e.message||e.error_description||e))}};
 
-const CP=(()=>{const m={},d=new TextDecoder("windows-1252");for(let b=128;b<160;b++)m[d.decode(new Uint8Array([b]))]=b;return m})();
-const MOJI=new RegExp("[ÃÂ][\\u0080-\\u00BF"+Object.keys(CP).join("")+"]|â€");
-function fx(v){
-  let t=String(v??"").replace(/_x000D_/g,"").replace(/\r/g,"").replace(/[\u00A0\u2007\u202F]/g," ").trim();
-  if(MOJI.test(t)){try{
-    const b=Uint8Array.from([...t],c=>{const k=c.charCodeAt(0);if(k<256&&!(k>=128&&k<160))return k;if(CP[c]!==undefined)return CP[c];throw 0});
-    t=new TextDecoder("utf-8",{fatal:true}).decode(b)}catch(e){}}
-  return t.normalize("NFC")}
-const NOMES={central:"Central",ceprocamp:"Ceprocamp"};
+/* Importação */
+function parseCsv(t){const first=t.split(/\r?\n/)[0]||"",dl=[";",",","\t"].map(d=>[d,first.split(d).length]).sort((a,b)=>b[1]-a[1])[0][0],rows=[];let r=[],c="",q=false;for(let i=0;i<t.length;i++){const ch=t[i];if(q){if(ch=='"'){if(t[i+1]=='"'){c+='"';i++}else q=false}else c+=ch}else if(ch=='"')q=true;else if(ch===dl){r.push(c);c=""}else if(ch=="\n"||ch=="\r"){if(ch=="\r"&&t[i+1]=="\n")i++;r.push(c);c="";if(r.some(x=>x.trim()))rows.push(r);r=[]}else c+=ch}r.push(c);if(r.some(x=>x.trim()))rows.push(r);return rows}
+const norm=s=>String(s??"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g,"");
+const num=s=>{s=String(s??"").trim().replace(/\s/g,"");if(!s)return 0;if(s.includes(",")&&s.includes("."))s=s.replace(/\./g,"").replace(",",".");else if(s.includes(","))s=s.replace(",",".");const n=parseFloat(s);return isNaN(n)?0:Math.max(0,n)};
 const stockOf=v=>{const n=norm(v||"");return n.includes("ceprocamp")||n.includes("cepro")?"ceprocamp":n.includes("central")?"central":null};
-/* Alguns sistemas geram .xlsx com XML em ISO-8859-1; reescreve em UTF-8 para não perder acentos */
-async function fixZip(buf){
-  if(!window.JSZip)return buf;
-  const z=await JSZip.loadAsync(buf);
-  for(const n of Object.keys(z.files)){
-    if(z.files[n].dir||!/\.(xml|rels)$/i.test(n))continue;
-    const b=await z.file(n).async("uint8array");
-    const m=new TextDecoder("latin1").decode(b.slice(0,200)).match(/encoding=["']([^"']+)["']/i);
-    if(m&&!/^utf-?8$/i.test(m[1])){
-      try{z.file(n,new TextDecoder(m[1]).decode(b).replace(/encoding=["'][^"']+["']/i,'encoding="UTF-8"'))}catch(e){}}
-  }
-  return z.generateAsync({type:"uint8array"});
-}
 async function importCsv(file){
-  const buf=await file.arrayBuffer(),u=new Uint8Array(buf);let rows;
-  const isBin=(u[0]===0x50&&u[1]===0x4B)||(u[0]===0xD0&&u[1]===0xCF);
+  const buf=await file.arrayBuffer(),u=new Uint8Array(buf);let rows;const isBin=(u[0]===0x50&&u[1]===0x4B)||(u[0]===0xD0&&u[1]===0xCF);
   const dec=()=>{try{return new TextDecoder("utf-8",{fatal:true}).decode(buf)}catch{return new TextDecoder("windows-1252").decode(buf)}};
-  try{
-    if(isBin){
-      if(!window.XLSX)return toast("Biblioteca de planilhas não carregou. Recarregue a página.");
-      const wb=XLSX.read(u[0]===0x50?await fixZip(buf):buf,{type:"array",codepage:1252});
-      rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:"",raw:true});
-    }else{
-      const txt=dec().replace(/^\uFEFF/,"");
-      if(/^\s*</.test(txt)){
-        if(!window.XLSX)return toast("Biblioteca de planilhas não carregou. Recarregue a página.");
-        const wb=XLSX.read(txt,{type:"string"});
-        rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:"",raw:true});
-      }else rows=parseCsv(txt);
-    }
-    rows=rows.map(r=>r.map(c=>String(c??""))).filter(r=>r.some(x=>x.trim()));
-  }catch(e){return toast("Não foi possível ler a planilha: "+e.message)}
+  try{if(isBin){if(!window.XLSX)return toast("Biblioteca de planilhas não carregou. Recarregue a página.");const wb=XLSX.read(buf,{type:"array",codepage:1252});rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:"",raw:true})}else{const txt=dec().replace(/^\uFEFF/,"");if(/^\s*</.test(txt)){if(!window.XLSX)return toast("Biblioteca de planilhas não carregou. Recarregue a página.");const wb=XLSX.read(txt,{type:"string"});rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:"",raw:true})}else rows=parseCsv(txt)}rows=rows.map(r=>r.map(c=>String(c??""))).filter(r=>r.some(x=>x.trim()))}catch(e){return toast("Não foi possível ler a planilha: "+e.message)}
   if(rows.length<2)return toast("Planilha vazia ou sem linhas de dados.");
-  const h=rows.shift().map(norm);
-  const col=al=>h.findIndex(x=>al.includes(x));
-  const iC=col(["codreduzido","codigo","cod","sku"]),iN=col(["descrproduto","nome","produto","item"]),
-        iQ=col(["qtatual","quantidade","qtd","qtde","estoque","saldo"]),iU=col(["unidade"]),iA=col(["nomealmox","almoxarifado"]);
+  const h=rows.shift().map(norm),col=al=>h.findIndex(x=>al.includes(x));
+  const iC=col(["codreduzido","codigo","cod","sku"]),iN=col(["descrproduto","nome","produto","item"]),iQ=col(["qtatual","quantidade","qtd","qtde","estoque","saldo"]),iU=col(["unidade"]),iA=col(["nomealmox","almoxarifado"]);
   if(iN<0||iC<0||(iA<0&&iU<0))return toast("A planilha precisa ter as colunas COD_REDUZIDO, DESCR_PRODUTO e NOME_ALMOX.");
-  const csv={central:new Map(),ceprocamp:new Map()},ign=new Set();let bad=0;
-  for(const r of rows){
-    const k=(iA>=0?stockOf(r[iA]):null)||(iU>=0?stockOf(r[iU]):null);
-    if(!k){ign.add(((iA>=0?r[iA]:r[iU])||"(vazio)").trim());continue}
-    const cod=fx(r[iC]);if(!cod)continue;
-    const q=iQ>=0?num(r[iQ]):null,p=csv[k].get(cod);
-    if(p){if(q!==null)p.quantidade=(p.quantidade||0)+q;continue}
-    const nm=fx(r[iN]);if(nm.includes("\uFFFD"))bad++;csv[k].set(cod,{codigo:cod,nome:nm,quantidade:q})}
-  const stamp=new Date().toISOString(),res={},w=[];
-  for(const k of ["central","ceprocamp"]){
-    if(!csv[k].size)continue;
-    const ex=new Map(items.filter(i=>i.estoque===k).map(i=>[i.codigo,i]));
-    let novos=0,zerados=0,alterados=0,reab=0;
-    for(const [cod,n] of csv[k]){
-      const cur=ex.get(cod);
-      if(!cur){novos++;w.push(["set",docId(k+"_"+cod),{estoque:k,codigo:cod,nome:n.nome||cod,descricao:"",quantidade:n.quantidade??0,ativo:true,imagem:"",imp:stamp,novo:true,zer:false,rep:false,antNome:"",antQtd:-1}]);continue}
-      const ch={};
-      if(n.nome&&n.nome!==cur.nome)ch.nome=n.nome;
-      if(n.quantidade!==null&&n.quantidade!==Number(cur.quantidade))ch.quantidade=n.quantidade;
-      if(Object.keys(ch).length){alterados++;const z=Number(cur.quantidade)>0&&ch.quantidade===0;if(z)zerados++;const rp=(Number(cur.quantidade)||0)===0&&ch.quantidade>0;if(rp)reab++;w.push(["update",cur._id,{...ch,imp:stamp,novo:false,zer:z,rep:rp,antNome:"nome" in ch?cur.nome:"",antQtd:"quantidade" in ch?(Number(cur.quantidade)||0):-1}])}
-    }
-    res[k]={data:stamp,arquivo:file.name,total:csv[k].size,novos,zerados,alterados,reab};
-  }
-  if(!w.length&&!Object.keys(res).length)return toast(ign.size?"Nenhuma linha reconhecida. Valores de NOME_ALMOX encontrados: "+[...ign].slice(0,5).join(", "):"Nenhum item na planilha.");
-  toast(`Aplicando ${w.length} alterações…`);
-  try{
-    for(let i=0;i<w.length;i+=20)await Promise.all(w.slice(i,i+20).map(([op,id,d])=>db.doc("itens/"+id)[op](d)));
-    for(const k in res)await db.doc("meta/importacao_"+k).set(res[k]);
-    toast(Object.keys(res).map(k=>`${NOMES[k]}: ${res[k].novos} novos, ${res[k].zerados} zerados, ${res[k].alterados} alterados, ${res[k].reab} reabastecidos`).join(" | ")+(ign.size?` — ${ign.size} valor(es) de almoxarifado ignorado(s): ${[...ign].slice(0,4).join(", ")}`:"")+(bad?` — ATENÇÃO: ${bad} nome(s) com caractere ilegível já no arquivo`:""),12000);
-  }catch(e){toast("Erro na importação: "+(e.message||e.code))}
+  const csv={central:new Map(),ceprocamp:new Map()},ign=new Set();
+  for(const r of rows){const k=(iA>=0?stockOf(r[iA]):null)||(iU>=0?stockOf(r[iU]):null);if(!k){ign.add(((iA>=0?r[iA]:r[iU])||"(vazio)").trim());continue}const cod=String(r[iC]??"").trim();if(!cod)continue;const q=iQ>=0?num(r[iQ]):null,p=csv[k].get(cod);if(p){if(q!==null)p.quantidade=(p.quantidade||0)+q;continue}csv[k].set(cod,{codigo:cod,nome:String(r[iN]??"").trim(),quantidade:q})}
+  const stamp=new Date().toISOString();
+  for(const k of ["central","ceprocamp"]){if(!csv[k].size)continue;const ex=new Map(items.filter(i=>i.estoque===k).map(i=>[i.codigo,i]));let novos=0,zerados=0,alterados=0,reab=0;
+    for(const [cod,n] of csv[k]){const cur=ex.get(cod);if(!cur){novos++;const {error}=await sb.from("itens").upsert({id:docId(k+"_"+cod),estoque:k,codigo:cod,nome:n.nome||cod,descricao:"",quantidade:n.quantidade??0,ativo:true,imagem:"",imp:stamp,novo:true,zer:false,rep:false,ant_nome:"",ant_qtd:-1},{onConflict:"id"});if(error)throw error;continue}
+      const ch={};if(n.nome&&n.nome!==cur.nome)ch.nome=n.nome;if(n.quantidade!==null&&n.quantidade!==Number(cur.quantidade))ch.quantidade=n.quantidade;if(Object.keys(ch).length){alterados++;const z=Number(cur.quantidade)>0&&ch.quantidade===0;if(z)zerados++;const rp=(Number(cur.quantidade)||0)===0&&ch.quantidade>0;if(rp)reab++;const {error}=await sb.from("itens").update({...ch,imp:stamp,novo:false,zer:z,rep:rp,ant_nome:"nome" in ch?cur.nome:"",ant_qtd:"quantidade" in ch?(Number(cur.quantidade)||0):-1}).eq("id",cur._id);if(error)throw error}}
+    const rec={estoque:k,data:stamp,arquivo:file.name,total:csv[k].size,novos,zerados,alterados,reab};const {error}=await sb.from("importacoes").upsert(rec,{onConflict:"estoque"});if(error)throw error}
+  await loadData();toast("Importação concluída.",8000);if(ign.size)toast(`Valores de almoxarifado ignorados: ${[...ign].slice(0,4).join(", ")}`,10000)
 }
 async function importImgs(files){
-  if(!assets)return toast("Upload de imagem indisponível para o seu perfil.");
-  const by=new Map();
-  items.forEach(i=>{const k=String(i.codigo).trim().toLowerCase();if(!by.has(k))by.set(k,[]);by.get(k).push(i)});
-  const jobs=[],sem=[];let ok=0,fail=0;
-  for(const f of files){
-    if(!f.type.startsWith("image/")){fail++;continue}
-    const m=by.get(f.name.replace(/\.[^.]+$/,"").trim().toLowerCase());
-    if(m)jobs.push([f,m]);else sem.push(f.name)}
-  for(let i=0;i<jobs.length;i+=4){
-    toast(`Enviando imagens… ${i}/${jobs.length}`,60000);
-    await Promise.all(jobs.slice(i,i+4).map(async([f,m])=>{
-      try{const r=await assets.upload(f);await Promise.all(m.map(it=>db.doc("itens/"+it._id).update({imagem:r.url})));ok++}catch(e){fail++}}))}
-  let msg=`${ok} imagem(ns) atualizada(s)`;
-  if(sem.length)msg+=` · ${sem.length} sem cadastro com esse código (ex.: ${sem.slice(0,3).join(", ")})`;
-  if(fail)msg+=` · ${fail} com falha`;
-  toast(msg,12000);
+  const by=new Map();items.forEach(i=>{const k=String(i.codigo).trim().toLowerCase();if(!by.has(k))by.set(k,[]);by.get(k).push(i)});const jobs=[],sem=[];let ok=0,fail=0;const erros=[];
+  const {data:{session}}=await sb.auth.getSession();
+  if(!session){toast("Sua sessão de administrador não está ativa. Faça login novamente.",12000);return}
+  for(const f of files){if(!f.type.startsWith("image/")){fail++;erros.push(`${f.name}: arquivo não reconhecido como imagem`);continue}const m=by.get(f.name.replace(/\.[^.]+$/,"" ).trim().toLowerCase());if(m)jobs.push([f,m]);else sem.push(f.name)}
+  for(let i=0;i<jobs.length;i+=4){toast(`Enviando imagens… ${i}/${jobs.length}`,60000);await Promise.all(jobs.slice(i,i+4).map(async([f,m])=>{try{for(const it of m){const path=`${it._id}/${f.name.replace(/[^A-Za-z0-9._-]/g,"_")}`;const up=await sb.storage.from("imagens").upload(path,f,{upsert:true,contentType:f.type||"image/jpeg",cacheControl:"3600"});if(up.error)throw new Error(`Storage (${up.error.statusCode||"erro"}): ${up.error.message||up.error.error||up.error}`);const {data}=sb.storage.from("imagens").getPublicUrl(path);if(!data?.publicUrl)throw new Error("Não foi possível obter a URL pública da imagem.");const {error:ue}=await sb.from("itens").update({imagem:data.publicUrl}).eq("id",it._id);if(ue)throw new Error(`Banco (${ue.code||"erro"}): ${ue.message||ue.details||ue.hint||ue}`)}ok++}catch(e){fail++;erros.push(`${f.name}: ${e.message||e}`)}}))}
+  await loadData();let msg=`${ok} imagem(ns) atualizada(s)`;if(sem.length)msg+=` · ${sem.length} sem cadastro com esse código (ex.: ${sem.slice(0,3).join(", ")})`;if(erros.length)msg+=` · ${fail} com falha: ${erros.slice(0,2).join(" | ")}`;toast(msg,18000)
 }
-$("#upimg").onclick=()=>assets?$("#imgs").click():toast("Upload de imagem indisponível para o seu perfil.");
+$("#upimg").onclick=()=>$("#imgs").click();
 $("#imgs").onchange=e=>{const f=[...e.target.files];e.target.value="";if(f.length)importImgs(f)};
 $("#up").onclick=()=>$("#csv").click();
 $("#csv").onchange=e=>{const f=e.target.files[0];e.target.value="";if(f)importCsv(f)};

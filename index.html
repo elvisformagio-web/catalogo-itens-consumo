@@ -129,10 +129,36 @@ const ph=n=>"data:image/svg+xml;utf8,"+encodeURIComponent(`<svg xmlns="http://ww
 const docId=c=>String(c).replace(/[^A-Za-z0-9_-]/g,"_").slice(0,150);
 const disp=i=>i.ativo!==false&&Number(i.quantidade)>0;
 async function loadData(){
-  const [{data:it,error:ie},{data:im,error:me}]=await Promise.all([sb.from("itens").select("*"),sb.from("importacoes").select("*")]);
-  if(ie)throw ie;if(me)throw me;
-  items=(it||[]).map(x=>({_id:x.id,...x})).sort((a,b)=>String(a.nome).localeCompare(String(b.nome),"pt-BR"));
-  imps={};(im||[]).forEach(x=>imps[x.estoque]=x);render();
+  // O Supabase/PostgREST limita uma consulta a 1.000 registros por padrão.
+  // Aqui carregamos em páginas de 1.000 até não haver mais registros.
+  async function carregarTodos(){
+    const pageSize=1000;
+    const todos=[];
+    for(let inicio=0;;inicio+=pageSize){
+      const {data,error}=await sb.from("itens").select("*").range(inicio,inicio+pageSize-1);
+      if(error)throw error;
+      const lote=data||[];
+      todos.push(...lote);
+      if(lote.length<pageSize)break;
+    }
+    return todos;
+  }
+
+  const [it,impRes]=await Promise.all([
+    carregarTodos(),
+    sb.from("importacoes").select("*")
+  ]);
+
+  if(impRes.error)throw impRes.error;
+
+  items=(it||[])
+    .map(x=>({_id:x.id,...x}))
+    .sort((a,b)=>String(a.nome).localeCompare(String(b.nome),"pt-BR"));
+
+  imps={};
+  (impRes.data||[]).forEach(x=>imps[x.estoque]=x);
+
+  render();
 }
 async function init(){
   try{const {data:{session}}=await sb.auth.getSession();admin=!!session}catch(e){admin=false}

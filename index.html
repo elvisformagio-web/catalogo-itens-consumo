@@ -33,7 +33,7 @@ input,textarea{font:inherit;color:var(--tx);background:var(--card);border:1px so
 .card{background:var(--card);border:1px solid var(--bd);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
 .card.off{opacity:.6}
 .img{aspect-ratio:4/3;background:var(--bd);position:relative}
-.img img{width:100%;height:100%;object-fit:cover;display:block}
+.img img{width:100%;height:100%;object-fit:contain;display:block;background:#fff}
 .tag{position:absolute;top:8px;left:8px;font-size:12px;font-weight:600;padding:3px 9px;border-radius:99px}
 .tag.ok{background:var(--okb);color:var(--ok)}.tag.no{background:var(--nob);color:var(--no)}
 .tag.dz{left:auto;right:8px;background:#222;color:#fff}
@@ -378,35 +378,7 @@ async function importCsv(file){
     toast("Erro na importação: "+(e.message||e.code||String(e)),18000);
   }
 }
-async function prepararImagem(file){
-  // Padroniza todas as imagens antes do envio: 1200x900 px, fundo branco,
-  // mantendo a proporção e sem esticar o produto. JPEG em alta qualidade.
-  const MAX_W=1200,MAX_H=900,QUALITY=.96;
-  const dataUrl=await new Promise((resolve,reject)=>{
-    const fr=new FileReader();fr.onload=()=>resolve(fr.result);fr.onerror=()=>reject(fr.error||new Error("Falha ao ler a imagem"));fr.readAsDataURL(file);
-  });
-  const img=await new Promise((resolve,reject)=>{const x=new Image();x.onload=()=>resolve(x);x.onerror=()=>reject(new Error("Imagem inválida"));x.src=dataUrl});
 
-  // Preenche melhor o quadro sem deformar nem cortar o produto.
-  // A imagem é ampliada quando necessário, mas mantém toda a imagem visível.
-  const scale=Math.max(MAX_W/img.naturalWidth,MAX_H/img.naturalHeight);
-  const w=Math.max(1,Math.round(img.naturalWidth*scale));
-  const h=Math.max(1,Math.round(img.naturalHeight*scale));
-
-  const c=document.createElement("canvas");c.width=MAX_W;c.height=MAX_H;
-  const ctx=c.getContext("2d");ctx.fillStyle="#fff";ctx.fillRect(0,0,MAX_W,MAX_H);
-  ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";
-
-  // Se a proporção não coincidir com 4:3, reduzimos a imagem proporcionalmente
-  // para caber inteira, evitando cortar o produto.
-  const fit=Math.min(MAX_W/w,MAX_H/h);
-  const fw=Math.round(w*fit),fh=Math.round(h*fit);
-  const x=Math.round((MAX_W-fw)/2),y=Math.round((MAX_H-fh)/2);
-  ctx.drawImage(img,x,y,fw,fh);
-  const blob=await new Promise((resolve,reject)=>c.toBlob(b=>b?resolve(b):reject(new Error("Não foi possível converter a imagem")),"image/jpeg",QUALITY));
-  const base=file.name.replace(/\.[^.]+$/i,"").replace(/[^A-Za-z0-9._-]/g,"_")||"imagem";
-  return new File([blob],base+".jpg",{type:"image/jpeg",lastModified:Date.now()});
-}
 async function importImgs(files){
   const by=new Map();items.forEach(i=>{const k=String(i.codigo).trim().toLowerCase();if(!by.has(k))by.set(k,[]);by.get(k).push(i)});const jobs=[],sem=[];let ok=0,fail=0;const erros=[];
   const {data:{session}}=await sb.auth.getSession();

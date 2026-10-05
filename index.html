@@ -81,6 +81,14 @@ header #up{background:var(--acc);border-color:var(--acc);color:#1b1f24;font-weig
 .act .dng{grid-column:1/-1;color:var(--no);border-color:var(--no)}
 .hint{font-size:12.5px;color:var(--mut);margin:-8px 0 16px}
 </style>
+
+<style>
+#imageModal{position:fixed;inset:0;background:rgba(0,0,0,.82);display:none;align-items:center;justify-content:center;z-index:9999;padding:24px;box-sizing:border-box}
+#imageModal.open{display:flex}
+#imageModal img{max-width:95vw;max-height:92vh;width:auto;height:auto;object-fit:contain;background:#fff;border-radius:8px;box-shadow:0 10px 40px rgba(0,0,0,.45)}
+#imageModalClose{position:absolute;top:14px;right:18px;width:42px;height:42px;border:0;border-radius:50%;font-size:28px;line-height:42px;cursor:pointer;background:#fff;color:#222}
+.img img{cursor:zoom-in}
+</style>
 </head>
 <body>
 <div class="wrap">
@@ -408,6 +416,38 @@ $("#imgs").onchange=e=>{const f=[...e.target.files];e.target.value="";if(f.lengt
 $("#up").onclick=()=>$("#csv").click();
 $("#csv").onchange=async e=>{const f=e.target.files[0];e.target.value="";if(f)await importCsv(f)};
 render();init();
+</script>
+
+<div id="imageModal" aria-hidden="true">
+  <button id="imageModalClose" type="button" aria-label="Fechar">×</button>
+  <img id="imageModalImg" alt="">
+</div>
+
+<script>
+(function(){
+  function abrirImagemGrande(src,alt){
+    const modal=document.getElementById("imageModal");
+    const img=document.getElementById("imageModalImg");
+    if(!modal||!img)return;
+    img.src=src; img.alt=alt||"";
+    modal.classList.add("open");
+    modal.setAttribute("aria-hidden","false");
+  }
+  function fecharImagemGrande(){
+    const modal=document.getElementById("imageModal");
+    const img=document.getElementById("imageModalImg");
+    if(!modal)return;
+    modal.classList.remove("open");
+    modal.setAttribute("aria-hidden","true");
+    if(img)img.src="";
+  }
+  document.addEventListener("click",function(e){
+    const pic=e.target.closest(".img img");
+    if(pic){e.preventDefault();e.stopPropagation();abrirImagemGrande(pic.currentSrc||pic.src,pic.alt);}
+    if(e.target.id==="imageModal"||e.target.id==="imageModalClose")fecharImagemGrande();
+  });
+  document.addEventListener("keydown",function(e){if(e.key==="Escape")fecharImagemGrande();});
+})();
 </script>
 </body>
 </html>

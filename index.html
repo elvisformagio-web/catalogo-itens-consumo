@@ -381,17 +381,28 @@ async function importCsv(file){
 async function prepararImagem(file){
   // Padroniza todas as imagens antes do envio: 1200x900 px, fundo branco,
   // mantendo a proporção e sem esticar o produto. JPEG em alta qualidade.
-  const MAX_W=1200,MAX_H=900,QUALITY=.94;
+  const MAX_W=1200,MAX_H=900,QUALITY=.96;
   const dataUrl=await new Promise((resolve,reject)=>{
     const fr=new FileReader();fr.onload=()=>resolve(fr.result);fr.onerror=()=>reject(fr.error||new Error("Falha ao ler a imagem"));fr.readAsDataURL(file);
   });
   const img=await new Promise((resolve,reject)=>{const x=new Image();x.onload=()=>resolve(x);x.onerror=()=>reject(new Error("Imagem inválida"));x.src=dataUrl});
-  const scale=Math.min(MAX_W/img.naturalWidth,MAX_H/img.naturalHeight,1);
-  const w=Math.max(1,Math.round(img.naturalWidth*scale)),h=Math.max(1,Math.round(img.naturalHeight*scale));
+
+  // Preenche melhor o quadro sem deformar nem cortar o produto.
+  // A imagem é ampliada quando necessário, mas mantém toda a imagem visível.
+  const scale=Math.max(MAX_W/img.naturalWidth,MAX_H/img.naturalHeight);
+  const w=Math.max(1,Math.round(img.naturalWidth*scale));
+  const h=Math.max(1,Math.round(img.naturalHeight*scale));
+
   const c=document.createElement("canvas");c.width=MAX_W;c.height=MAX_H;
   const ctx=c.getContext("2d");ctx.fillStyle="#fff";ctx.fillRect(0,0,MAX_W,MAX_H);
-  const x=Math.round((MAX_W-w)/2),y=Math.round((MAX_H-h)/2);
-  ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";ctx.drawImage(img,x,y,w,h);
+  ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";
+
+  // Se a proporção não coincidir com 4:3, reduzimos a imagem proporcionalmente
+  // para caber inteira, evitando cortar o produto.
+  const fit=Math.min(MAX_W/w,MAX_H/h);
+  const fw=Math.round(w*fit),fh=Math.round(h*fit);
+  const x=Math.round((MAX_W-fw)/2),y=Math.round((MAX_H-fh)/2);
+  ctx.drawImage(img,x,y,fw,fh);
   const blob=await new Promise((resolve,reject)=>c.toBlob(b=>b?resolve(b):reject(new Error("Não foi possível converter a imagem")),"image/jpeg",QUALITY));
   const base=file.name.replace(/\.[^.]+$/i,"").replace(/[^A-Za-z0-9._-]/g,"_")||"imagem";
   return new File([blob],base+".jpg",{type:"image/jpeg",lastModified:Date.now()});

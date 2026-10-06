@@ -450,5 +450,24 @@ render();init();
   document.addEventListener("keydown",function(e){if(e.key==="Escape")fecharImagemGrande();});
 })();
 </script>
+
+<script id="ajuste-automatico-fotos">
+(function(){
+  function ajustarFotos(){
+    document.querySelectorAll(".img img").forEach(function(img){
+      img.style.width="100%";
+      img.style.height="300px";
+      img.style.objectFit="contain";
+      img.style.objectPosition="center";
+      img.style.display="block";
+      img.style.cursor="zoom-in";
+    });
+  }
+  document.addEventListener("DOMContentLoaded",function(){
+    ajustarFotos();
+    new MutationObserver(ajustarFotos).observe(document.body,{childList:true,subtree:true});
+  });
+})();
+</script>
 </body>
 </html>

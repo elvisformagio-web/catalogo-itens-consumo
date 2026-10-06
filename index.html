@@ -90,7 +90,10 @@ header #up{background:var(--acc);border-color:var(--acc);color:#1b1f24;font-weig
 #imageModalClose{position:absolute;top:14px;right:18px;width:42px;height:42px;border:0;border-radius:50%;font-size:28px;line-height:42px;cursor:pointer;background:#fff;color:#222}
 .img img{cursor:zoom-in}
 </style>
-</head>
+<style id="fotos-300px">
+.img{width:100%!important;height:300px!important;min-height:300px!important;max-height:300px!important;display:flex!important;align-items:center!important;justify-content:center!important;overflow:hidden!important;background:#fff!important}
+.img img{width:100%!important;height:100%!important;object-fit:contain!important;object-position:center!important;display:block!important;background:#fff!important}
+</style></head>
 <body>
 <div class="wrap">
 <header>
@@ -397,10 +400,10 @@ async function importImgs(files){
     toast(`Padronizando e enviando imagens… ${i}/${jobs.length}`,60000);
     await Promise.all(jobs.slice(i,i+3).map(async([f,m])=>{
       try{
-        const padronizada=await prepararImagem(f);
+        
         for(const it of m){
-          const path=`${it._id}/${padronizada.name}`;
-          const up=await sb.storage.from("imagens").upload(path,padronizada,{upsert:true,contentType:"image/jpeg",cacheControl:"31536000"});
+          const path=`${it._id}/${f.name.replace(/[^A-Za-z0-9._-]/g,"_")}`;
+          const up=await sb.storage.from("imagens").upload(path,f,{upsert:true,cacheControl:"31536000"});
           if(up.error)throw new Error(`Storage (${up.error.statusCode||"erro"}): ${up.error.message||up.error.error||up.error}`);
           const {data}=sb.storage.from("imagens").getPublicUrl(path);if(!data?.publicUrl)throw new Error("Não foi possível obter a URL pública da imagem.");
           const {error:ue}=await sb.from("itens").update({imagem:data.publicUrl}).eq("id",it._id);if(ue)throw new Error(`Banco (${ue.code||"erro"}): ${ue.message||ue.details||ue.hint||ue}`);
@@ -448,25 +451,6 @@ render();init();
     if(e.target.id==="imageModal"||e.target.id==="imageModalClose")fecharImagemGrande();
   });
   document.addEventListener("keydown",function(e){if(e.key==="Escape")fecharImagemGrande();});
-})();
-</script>
-
-<script id="ajuste-automatico-fotos">
-(function(){
-  function ajustarFotos(){
-    document.querySelectorAll(".img img").forEach(function(img){
-      img.style.width="100%";
-      img.style.height="300px";
-      img.style.objectFit="contain";
-      img.style.objectPosition="center";
-      img.style.display="block";
-      img.style.cursor="zoom-in";
-    });
-  }
-  document.addEventListener("DOMContentLoaded",function(){
-    ajustarFotos();
-    new MutationObserver(ajustarFotos).observe(document.body,{childList:true,subtree:true});
-  });
 })();
 </script>
 </body>

@@ -242,32 +242,40 @@ const num=s=>{s=String(s??"").trim().replace(/\s/g,"");if(!s)return 0;if(s.inclu
 const stockOf=v=>{const n=norm(v||"");return n.includes("ceprocamp")||n.includes("cepro")?"ceprocamp":n.includes("central")?"central":null};
 function repararMojibake(v){
   let s=String(v??"");
-  // Corrige UTF-8 interpretado como Windows-1252/Latin-1.
-  // Ex.: PLÃSTICO -> PLÁSTICO; ALGODÃO -> ALGODÃO.
-  const cp={
+  const cp1252={
     "€":0x80,"‚":0x82,"ƒ":0x83,"„":0x84,"…":0x85,"†":0x86,"‡":0x87,
     "ˆ":0x88,"‰":0x89,"Š":0x8A,"‹":0x8B,"Œ":0x8C,"Ž":0x8E,
     "‘":0x91,"’":0x92,"“":0x93,"”":0x94,"•":0x95,"–":0x96,"—":0x97,
     "˜":0x98,"™":0x99,"š":0x9A,"›":0x9B,"œ":0x9C,"ž":0x9E,"Ÿ":0x9F
   };
-  function umaVez(t){
-    if(!/[ÃÂâð]/.test(t) && !t.includes("\uFFFD")) return t;
-    try{
-      const bytes=[];
-      for(const ch of t){
-        const n=ch.charCodeAt(0);
-        if(n<=0xFF) bytes.push(n);
-        else if(cp[ch]!==undefined) bytes.push(cp[ch]);
-        else return t;
-      }
-      const out=new TextDecoder("utf-8",{fatal:true}).decode(new Uint8Array(bytes));
-      return out||t;
-    }catch(e){return t}
+  const ruim=/[ÃÂâð][\u0080-\u00FF]|Ã.|Â.|â.|ð.|�/g;
+  function tentativa(t){
+    const bytes=[];
+    for(const ch of t){
+      const n=ch.charCodeAt(0);
+      if(n<=0xFF) bytes.push(n);
+      else if(cp1252[ch]!==undefined) bytes.push(cp1252[ch]);
+      else return null;
+    }
+    try{return new TextDecoder("utf-8",{fatal:true}).decode(new Uint8Array(bytes));}
+    catch(e){return null}
   }
-  for(let i=0;i<4;i++){
-    const n=umaVez(s);
-    if(n===s)break;
-    s=n;
+  function score(t){
+    let n=0;
+    n+=(t.match(/Ã/g)||[]).length*8;
+    n+=(t.match(/Â/g)||[]).length*6;
+    n+=(t.match(/â/g)||[]).length*5;
+    n+=(t.match(/ð/g)||[]).length*5;
+    n+=(t.match(/\uFFFD/g)||[]).length*20;
+    n+=(t.match(/[\u0080-\u009F]/g)||[]).length*10;
+    return n;
+  }
+  for(let i=0;i<5;i++){
+    if(!ruim.test(s)) break;
+    ruim.lastIndex=0;
+    const cand=tentativa(s);
+    if(!cand || cand===s || score(cand)>=score(s)) break;
+    s=cand;
   }
   return s;
 }

@@ -163,9 +163,24 @@ async function loadData(){
 
   if(impRes.error)throw impRes.error;
 
-  items=(it||[])
-    .map(x=>({_id:x.id,...x}))
-    .sort((a,b)=>String(a.nome).localeCompare(String(b.nome),"pt-BR"));
+  const dados=(it||[]).map(x=>{
+    const y={_id:x.id,...x};
+    y.nome=textoSeguro(y.nome);
+    y.descricao=textoSeguro(y.descricao);
+    return y;
+  });
+
+  // Corrige também os textos antigos já gravados no banco.
+  const correcoes=dados.filter((y,i)=>y.nome!==String((it||[])[i]?.nome??"")||y.descricao!==String((it||[])[i]?.descricao??""));
+  if(correcoes.length){
+    for(let i=0;i<correcoes.length;i+=100){
+      const lote=correcoes.slice(i,i+100).map(y=>({id:y.id,nome:y.nome,descricao:y.descricao}));
+      const {error}=await sb.from("itens").upsert(lote,{onConflict:"id"});
+      if(error)console.warn("Não foi possível corrigir textos antigos:",error);
+    }
+  }
+
+  items=dados.sort((a,b)=>String(a.nome).localeCompare(String(b.nome),"pt-BR"));
 
   imps={};
   (impRes.data||[]).forEach(x=>imps[x.estoque]=x);
@@ -225,10 +240,20 @@ function parseCsv(t){const first=t.split(/\r?\n/)[0]||"",dl=[";",",","\t"].map(d
 const norm=s=>String(s??"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g,"");
 const num=s=>{s=String(s??"").trim().replace(/\s/g,"");if(!s)return 0;if(s.includes(",")&&s.includes("."))s=s.replace(/\./g,"").replace(",",".");else if(s.includes(","))s=s.replace(",",".");const n=parseFloat(s);return isNaN(n)?0:Math.max(0,n)};
 const stockOf=v=>{const n=norm(v||"");return n.includes("ceprocamp")||n.includes("cepro")?"ceprocamp":n.includes("central")?"central":null};
+function repararMojibake(v){
+  let s=String(v??"");
+  // Corrige textos que já foram gravados de forma errada (ex.: PLÃSTICO).
+  // Só tenta a conversão quando há sinais claros de UTF-8 interpretado como Latin-1/Windows-1252.
+  if(!/[ÃÂâð][\x80-\xBF]|Ã.|Â.|â.|ð.|�/.test(s))return s;
+  try{
+    const corrigido=decodeURIComponent(escape(s));
+    if(corrigido && (corrigido!==s || /�/.test(s)))return corrigido;
+  }catch(e){}
+  return s;
+}
 function textoSeguro(v){
-  // Mantém acentos e caracteres normais exatamente como vieram da planilha.
-  // Remove apenas caracteres que PostgreSQL/JSON não consegue armazenar.
-  return String(v??"")
+  let s=repararMojibake(v);
+  return s
     .replace(/\u0000/g,"")
     .replace(/[\uD800-\uDFFF]/g,(ch,i,str)=>{
       const c=ch.charCodeAt(0);

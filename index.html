@@ -226,17 +226,16 @@ const norm=s=>String(s??"").toLowerCase().normalize("NFD").replace(/[\u0300-\u03
 const num=s=>{s=String(s??"").trim().replace(/\s/g,"");if(!s)return 0;if(s.includes(",")&&s.includes("."))s=s.replace(/\./g,"").replace(",",".");else if(s.includes(","))s=s.replace(",",".");const n=parseFloat(s);return isNaN(n)?0:Math.max(0,n)};
 const stockOf=v=>{const n=norm(v||"");return n.includes("ceprocamp")||n.includes("cepro")?"ceprocamp":n.includes("central")?"central":null};
 function textoSeguro(v){
+  // Mantém acentos e caracteres normais exatamente como vieram da planilha.
+  // Remove apenas caracteres que PostgreSQL/JSON não consegue armazenar.
   return String(v??"")
     .replace(/\u0000/g,"")
     .replace(/[\uD800-\uDFFF]/g,(ch,i,str)=>{
       const c=ch.charCodeAt(0);
       const next=i+1<str.length?str.charCodeAt(i+1):0;
-      if(c>=0xD800&&c<=0xDBFF&&next>=0xDC00&&next<=0xDFFF)return ch;
-      if(c>=0xDC00&&c<=0xDFFF){
-        const prev=i>0?str.charCodeAt(i-1):0;
-        if(prev>=0xD800&&prev<=0xDBFF)return ch;
-      }
-      return "";
+      const prev=i>0?str.charCodeAt(i-1):0;
+      const parValido=(c>=0xD800&&c<=0xDBFF&&next>=0xDC00&&next<=0xDFFF)||(c>=0xDC00&&c<=0xDFFF&&prev>=0xD800&&prev<=0xDBFF);
+      return parValido?ch:"";
     });
 }
 
@@ -253,7 +252,7 @@ async function importCsv(file){
 
     if(isBin){
       if(!window.XLSX)throw new Error("Biblioteca de planilhas não carregou. Recarregue a página e tente novamente.");
-      const wb=XLSX.read(buf,{type:"array",codepage:1252});
+      const wb=XLSX.read(buf,{type:"array"});
       rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:"",raw:true});
     }else{
       const txt=dec().replace(/^\uFEFF/,"");
@@ -264,7 +263,7 @@ async function importCsv(file){
       }else rows=parseCsv(txt);
     }
 
-    // Limpa caracteres que PostgreSQL não aceita em JSON/UTF-8.
+    // Remove apenas caracteres inválidos; acentos e Unicode válido são preservados.
     rows=rows.map(r=>r.map(c=>textoSeguro(c))).filter(r=>r.some(x=>x.trim()));
     const linhasPlanilha=Math.max(0,rows.length-1);
     if(rows.length<2){toast("Planilha vazia ou sem linhas de dados.",9000);return}

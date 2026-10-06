@@ -249,10 +249,16 @@ async function importCsv(file){
       }else rows=parseCsv(txt);
     }
 
-    // IMPORTAÇÃO DE TEXTO: não convertemos nem "corrigimos" caracteres.
-    // O XLSX é lido pelo SheetJS e o texto de DESCR_PRODUTO é preservado em Unicode.
-    const textoPlanilha=v=>String(v??"").replace(/\\u0000/g,"").trim();
-    rows=rows.map(r=>r.map(c=>String(c??""))).filter(r=>r.some(x=>x.trim()));
+    // IMPORTAÇÃO DE TEXTO: preserva os acentos da planilha.
+    // Também removemos apenas caracteres Unicode inválidos (surrogates isolados
+    // e NUL), que podem causar no PostgreSQL o erro "unsupported Unicode escape sequence".
+    const limparUnicode=v=>String(v??"")
+      .replace(/\u0000/g,"")
+      .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g,"")
+      .replace(/(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g,"")
+      .normalize("NFC");
+    const textoPlanilha=v=>limparUnicode(v).trim();
+    rows=rows.map(r=>r.map(c=>limparUnicode(c))).filter(r=>r.some(x=>x.trim()));
     const linhasPlanilha=rows.length-1;
     if(rows.length<2){toast("Planilha vazia ou sem linhas de dados.",9000);return}
 
@@ -315,8 +321,8 @@ async function importCsv(file){
           payload.push({
             id:docId(k+"_"+n.codigo),
             estoque:k,
-            codigo:n.codigo,
-            nome:n.nome||n.codigo,
+            codigo:limparUnicode(n.codigo),
+            nome:limparUnicode(n.nome||n.codigo),
             descricao:"",
             quantidade:q,
             ativo:true,
@@ -344,8 +350,8 @@ async function importCsv(file){
             id:cur._id,
             estoque:k,
             codigo:n.codigo,
-            nome:nomeMudou?n.nome:cur.nome,
-            descricao:cur.descricao||"",
+            nome:limparUnicode(nomeMudou?n.nome:cur.nome),
+            descricao:limparUnicode(cur.descricao||""),
             quantidade:q,
             ativo:cur.ativo!==false,
             imagem:cur.imagem||"",
@@ -361,7 +367,11 @@ async function importCsv(file){
 
       // Envia em lotes para não fazer centenas de requisições individuais.
       for(let i=0;i<payload.length;i+=200){
-        const lote=payload.slice(i,i+200);
+        const lote=payload.slice(i,i+200).map(o=>{
+          const x={...o};
+          for(const key of ["id","estoque","codigo","nome","descricao","imagem","imp","ant_nome"]) if(typeof x[key]==="string") x[key]=limparUnicode(x[key]);
+          return x;
+        });
         toast(`Gravando ${Math.min(i+lote.length,payload.length)}/${payload.length} itens do ${k==="central"?"Central":"Ceprocamp"}…`,60000);
         const {error}=await sb.from("itens").upsert(lote,{onConflict:"estoque,codigo"});
         if(error)throw error;

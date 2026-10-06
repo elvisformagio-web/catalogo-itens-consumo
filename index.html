@@ -202,7 +202,7 @@ document.querySelectorAll("#stk button").forEach(b=>b.onclick=()=>{est=b.dataset
 const LT={e:"Entradas (novos ou reabastecidos)",n:"Itens novos",z:"Itens que zeraram",a:"Itens alterados"};
 const NOMES={central:"Central",ceprocamp:"Ceprocamp"};
 const det=i=>{const d=[];if(i.novo)d.push(`Item novo · quantidade: ${Number(i.quantidade)||0}`);if(i.rep)d.push("Voltou ao estoque (estava zerado)");if(Number(i.ant_qtd)>=0)d.push(`Quantidade: ${i.ant_qtd} → ${Number(i.quantidade)||0}`);if(i.ant_nome)d.push(`Nome anterior: ${i.ant_nome}`);return d.join("\n")};
-$("#stats").addEventListener("click",e=>{const b=e.target.closest("[data-l]");if(!b||!admin)return;const k=b.dataset.l,imp=imps[est];if(!imp)return;const l=items.filter(i=>i.estoque===est&&i.imp===imp.data&&(k==="n"?i.novo===true:k==="e"?(i.novo===true||i.rep===true):k==="z"?i.zer===true:i.novo===false));const tit=`${LT[k]} na última importação — Almoxarifado ${NOMES[est]} (${l.length})`,sub=`Almoxarifado ${NOMES[est]} · Importação de ${new Date(imp.data).toLocaleString("pt-BR")} · Emitido em ${new Date().toLocaleString("pt-BR")}`;relat={k,tit,sub,l};$("#lt").textContent=tit;$("#lb").innerHTML=l.length?l.map(i=>`<div class="lr"><span class="cod">${esc(i.codigo)}</span><div><b>${esc(i.nome)}</b><div class="dt">${esc(det(i))}</div></div></div>`).join(""):'<div class="empty">A lista detalhada fica disponível a partir da próxima importação feita com esta versão.</div>';$("#ph").innerHTML=`<div class="pl"><img src="${document.querySelector("header img").src}" width="56" height="56" alt=""><div><b>FUMEC — Fundação Municipal para Educação Comunitária</b><br>${esc(sub)}</div></div>Total de itens: <b>${l.length}</b>`;$("#lst").classList.add("on")});
+$("#stats").addEventListener("click",e=>{const b=e.target.closest("[data-l]");if(!b||!admin)return;const k=b.dataset.l,imp=imps[est];if(!imp)return;const mesmaImportacao=i=>{if(!i.imp||!imp.data)return false;const a=Date.parse(i.imp),b=Date.parse(imp.data);return Number.isFinite(a)&&Number.isFinite(b)?a===b:String(i.imp)===String(imp.data)};const l=items.filter(i=>i.estoque===est&&mesmaImportacao(i)&&(k==="n"?i.novo===true:k==="e"?(i.novo===true||i.rep===true):k==="z"?((i.zer===true)||(Number(i.ant_qtd)>0&&Number(i.quantidade)===0)):i.novo===false));const tit=`${LT[k]} na última importação — Almoxarifado ${NOMES[est]} (${l.length})`,sub=`Almoxarifado ${NOMES[est]} · Importação de ${new Date(imp.data).toLocaleString("pt-BR")} · Emitido em ${new Date().toLocaleString("pt-BR")}`;relat={k,tit,sub,l};$("#lt").textContent=tit;$("#lb").innerHTML=l.length?l.map(i=>`<div class="lr"><span class="cod">${esc(i.codigo)}</span><div><b>${esc(i.nome)}</b><div class="dt">${esc(det(i))}</div></div></div>`).join(""):'<div class="empty">A lista detalhada fica disponível a partir da próxima importação feita com esta versão.</div>';$("#ph").innerHTML=`<div class="pl"><img src="${document.querySelector("header img").src}" width="56" height="56" alt=""><div><b>FUMEC — Fundação Municipal para Educação Comunitária</b><br>${esc(sub)}</div></div>Total de itens: <b>${l.length}</b>`;$("#lst").classList.add("on")});
 $("#lp").onclick=()=>{if(!relat||!relat.l.length)return toast("Não há itens para imprimir.");window.print()};
 $("#lc").onclick=()=>$("#lst").classList.remove("on");
 function applyMode(){
@@ -322,6 +322,7 @@ async function importCsv(file){
 
     for(const k of ["central","ceprocamp"]){
       const lista=[...grupos[k].values()];
+      let zeradosEstoque=0, reabEstoque=0, alteradosEstoque=0;
       if(!lista.length)continue;
 
       const existentes=new Map(items.filter(i=>i.estoque===k).map(i=>[String(i.codigo).trim(),i]));
@@ -356,10 +357,10 @@ async function importCsv(file){
           const z=antiga>0&&q===0;
           const rp=antiga===0&&q>0;
 
-          if(nomeMudou||qtdMudou)alteradosTotal++;
+          if(nomeMudou||qtdMudou){alteradosTotal++;alteradosEstoque++;}
           else semMudancaTotal++;
-          if(z)zeradosTotal++;
-          if(rp)reabTotal++;
+          if(z){zeradosTotal++;zeradosEstoque++;}
+          if(rp){reabTotal++;reabEstoque++;}
 
           payload.push({
             id:cur._id,
@@ -395,9 +396,9 @@ async function importCsv(file){
         arquivo:file.name,
         total:lista.length,
         novos:[...lista].filter(n=>!existentes.has(n.codigo)).length,
-        zerados:zeradosTotal,
-        alterados:alteradosTotal,
-        reab:reabTotal
+        zerados:zeradosEstoque,
+        alterados:alteradosEstoque,
+        reab:reabEstoque
       };
       const {error:ie}=await sb.from("importacoes").upsert(rec,{onConflict:"estoque"});
       if(ie)throw ie;

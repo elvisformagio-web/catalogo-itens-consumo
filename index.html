@@ -240,7 +240,7 @@ async function fixZip(buf){
   if(!window.JSZip)return buf;
   const z=await JSZip.loadAsync(buf);
   for(const n of Object.keys(z.files)){
-    if(z.files[n].dir||!\.(xml|rels)$/i.test(n))continue;
+    if(z.files[n].dir||!(/\.(xml|rels)$/i.test(n)))continue;
     const b=await z.file(n).async("uint8array");
     const m=new TextDecoder("latin1").decode(b.slice(0,200)).match(/encoding=["']([^"']+)["']/i);
     if(m&&!/^utf-?8$/i.test(m[1])){

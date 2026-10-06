@@ -225,6 +225,21 @@ function parseCsv(t){const first=t.split(/\r?\n/)[0]||"",dl=[";",",","\t"].map(d
 const norm=s=>String(s??"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g,"");
 const num=s=>{s=String(s??"").trim().replace(/\s/g,"");if(!s)return 0;if(s.includes(",")&&s.includes("."))s=s.replace(/\./g,"").replace(",",".");else if(s.includes(","))s=s.replace(",",".");const n=parseFloat(s);return isNaN(n)?0:Math.max(0,n)};
 const stockOf=v=>{const n=norm(v||"");return n.includes("ceprocamp")||n.includes("cepro")?"ceprocamp":n.includes("central")?"central":null};
+function textoSeguro(v){
+  return String(v??"")
+    .replace(/\u0000/g,"")
+    .replace(/[\uD800-\uDFFF]/g,(ch,i,str)=>{
+      const c=ch.charCodeAt(0);
+      const next=i+1<str.length?str.charCodeAt(i+1):0;
+      if(c>=0xD800&&c<=0xDBFF&&next>=0xDC00&&next<=0xDFFF)return ch;
+      if(c>=0xDC00&&c<=0xDFFF){
+        const prev=i>0?str.charCodeAt(i-1):0;
+        if(prev>=0xD800&&prev<=0xDBFF)return ch;
+      }
+      return "";
+    });
+}
+
 async function importCsv(file){
   toast(`Lendo a planilha “${file.name}”…`,60000);
   try{
@@ -249,8 +264,9 @@ async function importCsv(file){
       }else rows=parseCsv(txt);
     }
 
-    rows=rows.map(r=>r.map(c=>String(c??""))).filter(r=>r.some(x=>x.trim()));
-    const linhasPlanilha=rows.length-1;
+    // Limpa caracteres que PostgreSQL não aceita em JSON/UTF-8.
+    rows=rows.map(r=>r.map(c=>textoSeguro(c))).filter(r=>r.some(x=>x.trim()));
+    const linhasPlanilha=Math.max(0,rows.length-1);
     if(rows.length<2){toast("Planilha vazia ou sem linhas de dados.",9000);return}
 
     const h=rows.shift().map(norm),col=al=>h.findIndex(x=>al.includes(x));
@@ -266,18 +282,16 @@ async function importCsv(file){
 
     const grupos={central:new Map(),ceprocamp:new Map()},ignoradas=[];
     for(const r of rows){
-      const almox=String(r[iA]??"").trim();
+      const almox=textoSeguro(r[iA]).trim();
       const k=stockOf(almox);
-      if(!k){ignoradas.push({almox,codigo:String(r[iC]??"").trim()});continue}
+      if(!k){ignoradas.push({almox,codigo:textoSeguro(r[iC]).trim()});continue}
 
-      const cod=String(r[iC]??"").trim();
+      const cod=textoSeguro(r[iC]).trim();
       if(!cod){ignoradas.push({almox,codigo:"(sem código)"});continue}
 
-      const nome=String(r[iN]??"").trim();
+      const nome=textoSeguro(r[iN]).trim();
       const quantidade=iQ>=0?num(r[iQ]):0;
 
-      // Se o mesmo código aparecer duas vezes no mesmo almoxarifado,
-      // somamos as quantidades, em vez de perder uma das linhas.
       const existente=grupos[k].get(cod);
       if(existente) existente.quantidade+=quantidade;
       else grupos[k].set(cod,{codigo:cod,nome:nome||cod,quantidade});
@@ -294,26 +308,26 @@ async function importCsv(file){
 
     const stamp=new Date().toISOString();
     let totalGravadas=0,novosTotal=0,alteradosTotal=0,semMudancaTotal=0,zeradosTotal=0,reabTotal=0;
-    const erros=[];
 
     for(const k of ["central","ceprocamp"]){
       const lista=[...grupos[k].values()];
       if(!lista.length)continue;
 
-      const existentes=new Map(items.filter(i=>i.estoque===k).map(i=>[String(i.codigo).trim(),i]));
+      const existentes=new Map(items.filter(i=>i.estoque===k).map(i=>[textoSeguro(i.codigo).trim(),i]));
       const payload=[];
+      let zeradosEstoque=0,alteradosEstoque=0,reabEstoque=0,novosEstoque=0;
 
       for(const n of lista){
         const cur=existentes.get(n.codigo);
         const q=Number(n.quantidade)||0;
 
         if(!cur){
-          novosTotal++;
+          novosTotal++;novosEstoque++;
           payload.push({
             id:docId(k+"_"+n.codigo),
             estoque:k,
-            codigo:n.codigo,
-            nome:n.nome||n.codigo,
+            codigo:textoSeguro(n.codigo),
+            nome:textoSeguro(n.nome||n.codigo),
             descricao:"",
             quantidade:q,
             ativo:true,
@@ -327,56 +341,60 @@ async function importCsv(file){
           });
         }else{
           const antiga=Number(cur.quantidade)||0;
-          const nomeMudou=n.nome && n.nome!==cur.nome;
+          const nomeAnterior=textoSeguro(cur.nome);
+          const nomeNovo=textoSeguro(n.nome);
+          const nomeMudou=nomeNovo && nomeNovo!==nomeAnterior;
           const qtdMudou=antiga!==q;
           const z=antiga>0&&q===0;
           const rp=antiga===0&&q>0;
 
-          if(nomeMudou||qtdMudou)alteradosTotal++;
+          if(nomeMudou||qtdMudou){alteradosTotal++;alteradosEstoque++}
           else semMudancaTotal++;
-          if(z)zeradosTotal++;
-          if(rp)reabTotal++;
+          if(z){zeradosTotal++;zeradosEstoque++}
+          if(rp){reabTotal++;reabEstoque++}
 
           payload.push({
-            id:cur._id,
+            id:textoSeguro(cur._id),
             estoque:k,
-            codigo:n.codigo,
-            nome:nomeMudou?n.nome:cur.nome,
-            descricao:cur.descricao||"",
+            codigo:textoSeguro(n.codigo),
+            nome:nomeMudou?nomeNovo:nomeAnterior,
+            descricao:textoSeguro(cur.descricao||""),
             quantidade:q,
             ativo:cur.ativo!==false,
-            imagem:cur.imagem||"",
+            imagem:textoSeguro(cur.imagem||""),
             imp:stamp,
             novo:false,
             zer:z,
             rep:rp,
-            ant_nome:nomeMudou?cur.nome:"",
+            ant_nome:nomeMudou?nomeAnterior:"",
             ant_qtd:qtdMudou?antiga:-1
           });
         }
       }
 
-      // Envia em lotes para não fazer centenas de requisições individuais.
       for(let i=0;i<payload.length;i+=200){
         const lote=payload.slice(i,i+200);
         toast(`Gravando ${Math.min(i+lote.length,payload.length)}/${payload.length} itens do ${k==="central"?"Central":"Ceprocamp"}…`,60000);
         const {error}=await sb.from("itens").upsert(lote,{onConflict:"estoque,codigo"});
-        if(error)throw error;
+        if(error){
+          console.error("Falha no lote",k,i,error,lote);
+          throw new Error(`${error.message||error.code||String(error)} [${k}, lote ${Math.floor(i/200)+1}]`);
+        }
         totalGravadas+=lote.length;
       }
 
       const rec={
         estoque:k,
         data:stamp,
-        arquivo:file.name,
+        arquivo:textoSeguro(file.name),
         total:lista.length,
-        novos:[...lista].filter(n=>!existentes.has(n.codigo)).length,
-        zerados:zeradosTotal,
-        alterados:alteradosTotal,
-        reab:reabTotal
+        novos:novosEstoque,
+        zerados:zeradosEstoque,
+        alterados:alteradosEstoque,
+        reab:reabEstoque
       };
       const {error:ie}=await sb.from("importacoes").upsert(rec,{onConflict:"estoque"});
-      if(ie)throw ie;
+      if(ie)throw new Error(`Registro da importação (${k}): ${ie.message||ie.code||String(ie)}`);
     }
 
     await loadData();
@@ -390,7 +408,6 @@ async function importCsv(file){
     toast("Erro na importação: "+(e.message||e.code||String(e)),18000);
   }
 }
-
 async function importImgs(files){
   const by=new Map();items.forEach(i=>{const k=String(i.codigo).trim().toLowerCase();if(!by.has(k))by.set(k,[]);by.get(k).push(i)});const jobs=[],sem=[];let ok=0,fail=0;const erros=[];
   const {data:{session}}=await sb.auth.getSession();

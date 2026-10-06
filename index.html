@@ -163,24 +163,9 @@ async function loadData(){
 
   if(impRes.error)throw impRes.error;
 
-  const dados=(it||[]).map(x=>{
-    const y={_id:x.id,...x};
-    y.nome=textoSeguro(y.nome);
-    y.descricao=textoSeguro(y.descricao);
-    return y;
-  });
-
-  // Corrige também os textos antigos já gravados no banco.
-  const correcoes=dados.filter((y,i)=>y.nome!==String((it||[])[i]?.nome??"")||y.descricao!==String((it||[])[i]?.descricao??""));
-  if(correcoes.length){
-    for(let i=0;i<correcoes.length;i+=100){
-      const lote=correcoes.slice(i,i+100).map(y=>({id:y.id,nome:y.nome,descricao:y.descricao}));
-      const {error}=await sb.from("itens").upsert(lote,{onConflict:"id"});
-      if(error)console.warn("Não foi possível corrigir textos antigos:",error);
-    }
-  }
-
-  items=dados.sort((a,b)=>String(a.nome).localeCompare(String(b.nome),"pt-BR"));
+  items=(it||[])
+    .map(x=>({_id:x.id,...x}))
+    .sort((a,b)=>String(a.nome).localeCompare(String(b.nome),"pt-BR"));
 
   imps={};
   (impRes.data||[]).forEach(x=>imps[x.estoque]=x);
@@ -240,59 +225,6 @@ function parseCsv(t){const first=t.split(/\r?\n/)[0]||"",dl=[";",",","\t"].map(d
 const norm=s=>String(s??"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g,"");
 const num=s=>{s=String(s??"").trim().replace(/\s/g,"");if(!s)return 0;if(s.includes(",")&&s.includes("."))s=s.replace(/\./g,"").replace(",",".");else if(s.includes(","))s=s.replace(",",".");const n=parseFloat(s);return isNaN(n)?0:Math.max(0,n)};
 const stockOf=v=>{const n=norm(v||"");return n.includes("ceprocamp")||n.includes("cepro")?"ceprocamp":n.includes("central")?"central":null};
-function repararMojibake(v){
-  let s=String(v??"");
-  const cp1252={
-    "€":0x80,"‚":0x82,"ƒ":0x83,"„":0x84,"…":0x85,"†":0x86,"‡":0x87,
-    "ˆ":0x88,"‰":0x89,"Š":0x8A,"‹":0x8B,"Œ":0x8C,"Ž":0x8E,
-    "‘":0x91,"’":0x92,"“":0x93,"”":0x94,"•":0x95,"–":0x96,"—":0x97,
-    "˜":0x98,"™":0x99,"š":0x9A,"›":0x9B,"œ":0x9C,"ž":0x9E,"Ÿ":0x9F
-  };
-  const ruim=/[ÃÂâð][\u0080-\u00FF]|Ã.|Â.|â.|ð.|�/g;
-  function tentativa(t){
-    const bytes=[];
-    for(const ch of t){
-      const n=ch.charCodeAt(0);
-      if(n<=0xFF) bytes.push(n);
-      else if(cp1252[ch]!==undefined) bytes.push(cp1252[ch]);
-      else return null;
-    }
-    try{return new TextDecoder("utf-8",{fatal:true}).decode(new Uint8Array(bytes));}
-    catch(e){return null}
-  }
-  function score(t){
-    let n=0;
-    n+=(t.match(/Ã/g)||[]).length*8;
-    n+=(t.match(/Â/g)||[]).length*6;
-    n+=(t.match(/â/g)||[]).length*5;
-    n+=(t.match(/ð/g)||[]).length*5;
-    n+=(t.match(/\uFFFD/g)||[]).length*20;
-    n+=(t.match(/[\u0080-\u009F]/g)||[]).length*10;
-    return n;
-  }
-  for(let i=0;i<5;i++){
-    if(!ruim.test(s)) break;
-    ruim.lastIndex=0;
-    const cand=tentativa(s);
-    if(!cand || cand===s || score(cand)>=score(s)) break;
-    s=cand;
-  }
-  return s;
-}
-function textoSeguro(v){
-  let s=repararMojibake(v);
-  return s
-    .replace(/\u0000/g,"")
-    .replace(/[\uD800-\uDFFF]/g,(ch,i,str)=>{
-      const c=ch.charCodeAt(0);
-      const next=i+1<str.length?str.charCodeAt(i+1):0;
-      const prev=i>0?str.charCodeAt(i-1):0;
-      const parValido=(c>=0xD800&&c<=0xDBFF&&next>=0xDC00&&next<=0xDFFF)||(c>=0xDC00&&c<=0xDFFF&&prev>=0xD800&&prev<=0xDBFF);
-      return parValido?ch:"";
-    })
-    .normalize("NFC");
-}
-
 async function importCsv(file){
   toast(`Lendo a planilha “${file.name}”…`,60000);
   try{
@@ -306,20 +238,22 @@ async function importCsv(file){
 
     if(isBin){
       if(!window.XLSX)throw new Error("Biblioteca de planilhas não carregou. Recarregue a página e tente novamente.");
-      const wb=XLSX.read(buf,{type:"array"});
-      rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:"",raw:true});
+      const wb=XLSX.read(buf,{type:"array",cellText:true,cellNF:false,cellDates:false});
+      rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:"",raw:false});
     }else{
       const txt=dec().replace(/^\uFEFF/,"");
       if(/^\s*</.test(txt)){
         if(!window.XLSX)throw new Error("Biblioteca de planilhas não carregou. Recarregue a página e tente novamente.");
-        const wb=XLSX.read(txt,{type:"string"});
-        rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:"",raw:true});
+        const wb=XLSX.read(txt,{type:"string",cellText:true,cellNF:false,cellDates:false});
+        rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:"",raw:false});
       }else rows=parseCsv(txt);
     }
 
-    // Remove apenas caracteres inválidos; acentos e Unicode válido são preservados.
-    rows=rows.map(r=>r.map(c=>textoSeguro(c))).filter(r=>r.some(x=>x.trim()));
-    const linhasPlanilha=Math.max(0,rows.length-1);
+    // IMPORTAÇÃO DE TEXTO: não convertemos nem "corrigimos" caracteres.
+    // O XLSX é lido pelo SheetJS e o texto de DESCR_PRODUTO é preservado em Unicode.
+    const textoPlanilha=v=>String(v??"").replace(/\\u0000/g,"").trim();
+    rows=rows.map(r=>r.map(c=>String(c??""))).filter(r=>r.some(x=>x.trim()));
+    const linhasPlanilha=rows.length-1;
     if(rows.length<2){toast("Planilha vazia ou sem linhas de dados.",9000);return}
 
     const h=rows.shift().map(norm),col=al=>h.findIndex(x=>al.includes(x));
@@ -335,16 +269,18 @@ async function importCsv(file){
 
     const grupos={central:new Map(),ceprocamp:new Map()},ignoradas=[];
     for(const r of rows){
-      const almox=textoSeguro(r[iA]).trim();
+      const almox=textoPlanilha(r[iA]);
       const k=stockOf(almox);
-      if(!k){ignoradas.push({almox,codigo:textoSeguro(r[iC]).trim()});continue}
+      if(!k){ignoradas.push({almox,codigo:String(r[iC]??"").trim()});continue}
 
-      const cod=textoSeguro(r[iC]).trim();
+      const cod=textoPlanilha(r[iC]);
       if(!cod){ignoradas.push({almox,codigo:"(sem código)"});continue}
 
-      const nome=textoSeguro(r[iN]).trim();
+      const nome=textoPlanilha(r[iN]);
       const quantidade=iQ>=0?num(r[iQ]):0;
 
+      // Se o mesmo código aparecer duas vezes no mesmo almoxarifado,
+      // somamos as quantidades, em vez de perder uma das linhas.
       const existente=grupos[k].get(cod);
       if(existente) existente.quantidade+=quantidade;
       else grupos[k].set(cod,{codigo:cod,nome:nome||cod,quantidade});
@@ -361,26 +297,26 @@ async function importCsv(file){
 
     const stamp=new Date().toISOString();
     let totalGravadas=0,novosTotal=0,alteradosTotal=0,semMudancaTotal=0,zeradosTotal=0,reabTotal=0;
+    const erros=[];
 
     for(const k of ["central","ceprocamp"]){
       const lista=[...grupos[k].values()];
       if(!lista.length)continue;
 
-      const existentes=new Map(items.filter(i=>i.estoque===k).map(i=>[textoSeguro(i.codigo).trim(),i]));
+      const existentes=new Map(items.filter(i=>i.estoque===k).map(i=>[String(i.codigo).trim(),i]));
       const payload=[];
-      let zeradosEstoque=0,alteradosEstoque=0,reabEstoque=0,novosEstoque=0;
 
       for(const n of lista){
         const cur=existentes.get(n.codigo);
         const q=Number(n.quantidade)||0;
 
         if(!cur){
-          novosTotal++;novosEstoque++;
+          novosTotal++;
           payload.push({
             id:docId(k+"_"+n.codigo),
             estoque:k,
-            codigo:textoSeguro(n.codigo),
-            nome:textoSeguro(n.nome||n.codigo),
+            codigo:n.codigo,
+            nome:n.nome||n.codigo,
             descricao:"",
             quantidade:q,
             ativo:true,
@@ -394,60 +330,56 @@ async function importCsv(file){
           });
         }else{
           const antiga=Number(cur.quantidade)||0;
-          const nomeAnterior=textoSeguro(cur.nome);
-          const nomeNovo=textoSeguro(n.nome);
-          const nomeMudou=nomeNovo && nomeNovo!==nomeAnterior;
+          const nomeMudou=n.nome && n.nome!==cur.nome;
           const qtdMudou=antiga!==q;
           const z=antiga>0&&q===0;
           const rp=antiga===0&&q>0;
 
-          if(nomeMudou||qtdMudou){alteradosTotal++;alteradosEstoque++}
+          if(nomeMudou||qtdMudou)alteradosTotal++;
           else semMudancaTotal++;
-          if(z){zeradosTotal++;zeradosEstoque++}
-          if(rp){reabTotal++;reabEstoque++}
+          if(z)zeradosTotal++;
+          if(rp)reabTotal++;
 
           payload.push({
-            id:textoSeguro(cur._id),
+            id:cur._id,
             estoque:k,
-            codigo:textoSeguro(n.codigo),
-            nome:nomeMudou?nomeNovo:nomeAnterior,
-            descricao:textoSeguro(cur.descricao||""),
+            codigo:n.codigo,
+            nome:nomeMudou?n.nome:cur.nome,
+            descricao:cur.descricao||"",
             quantidade:q,
             ativo:cur.ativo!==false,
-            imagem:textoSeguro(cur.imagem||""),
+            imagem:cur.imagem||"",
             imp:stamp,
             novo:false,
             zer:z,
             rep:rp,
-            ant_nome:nomeMudou?nomeAnterior:"",
+            ant_nome:nomeMudou?cur.nome:"",
             ant_qtd:qtdMudou?antiga:-1
           });
         }
       }
 
+      // Envia em lotes para não fazer centenas de requisições individuais.
       for(let i=0;i<payload.length;i+=200){
         const lote=payload.slice(i,i+200);
         toast(`Gravando ${Math.min(i+lote.length,payload.length)}/${payload.length} itens do ${k==="central"?"Central":"Ceprocamp"}…`,60000);
         const {error}=await sb.from("itens").upsert(lote,{onConflict:"estoque,codigo"});
-        if(error){
-          console.error("Falha no lote",k,i,error,lote);
-          throw new Error(`${error.message||error.code||String(error)} [${k}, lote ${Math.floor(i/200)+1}]`);
-        }
+        if(error)throw error;
         totalGravadas+=lote.length;
       }
 
       const rec={
         estoque:k,
         data:stamp,
-        arquivo:textoSeguro(file.name),
+        arquivo:file.name,
         total:lista.length,
-        novos:novosEstoque,
-        zerados:zeradosEstoque,
-        alterados:alteradosEstoque,
-        reab:reabEstoque
+        novos:[...lista].filter(n=>!existentes.has(n.codigo)).length,
+        zerados:zeradosTotal,
+        alterados:alteradosTotal,
+        reab:reabTotal
       };
       const {error:ie}=await sb.from("importacoes").upsert(rec,{onConflict:"estoque"});
-      if(ie)throw new Error(`Registro da importação (${k}): ${ie.message||ie.code||String(ie)}`);
+      if(ie)throw ie;
     }
 
     await loadData();
@@ -461,6 +393,7 @@ async function importCsv(file){
     toast("Erro na importação: "+(e.message||e.code||String(e)),18000);
   }
 }
+
 async function importImgs(files){
   const by=new Map();items.forEach(i=>{const k=String(i.codigo).trim().toLowerCase();if(!by.has(k))by.set(k,[]);by.get(k).push(i)});const jobs=[],sem=[];let ok=0,fail=0;const erros=[];
   const {data:{session}}=await sb.auth.getSession();

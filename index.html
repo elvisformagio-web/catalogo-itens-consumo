@@ -93,7 +93,20 @@ header #up{background:var(--acc);border-color:var(--acc);color:#1b1f24;font-weig
 <style id="fotos-300px">
 .img{width:100%!important;height:300px!important;min-height:300px!important;max-height:300px!important;display:flex!important;align-items:center!important;justify-content:center!important;overflow:hidden!important;background:#fff!important}
 .img img{width:100%!important;height:100%!important;object-fit:contain!important;object-position:center!important;display:block!important;background:#fff!important}
-</style></head>
+</style><style id="print-a4-fix">
+@page{size:A4 portrait;margin:10mm;}
+@media print{
+html,body{width:210mm!important;max-width:210mm!important;min-width:0!important;margin:0!important;padding:0!important;overflow:visible!important;background:#fff!important;}
+body{font-size:9pt!important;}
+#lst.on{position:static!important;display:block!important;background:#fff!important;padding:0!important;}
+#lst .modal,#lst .panel,#lst .box{width:100%!important;max-width:100%!important;max-height:none!important;margin:0!important;padding:0!important;box-sizing:border-box!important;overflow:visible!important;}
+#lst table{width:100%!important;max-width:100%!important;table-layout:fixed!important;border-collapse:collapse!important;font-size:8pt!important;}
+#lst th,#lst td{padding:2.5px 3px!important;overflow-wrap:anywhere!important;word-break:break-word!important;}
+#lst th:nth-child(1),#lst td:nth-child(1){width:24mm!important;}
+#lst th:nth-child(2),#lst td:nth-child(2){width:62mm!important;}
+#lst th:nth-child(3),#lst td:nth-child(3){width:auto!important;}
+#lst button,#lst .close,#lst .actions{display:none!important;}
+} </style></head>
 <body>
 <div class="wrap">
 <header>

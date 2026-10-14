@@ -93,6 +93,11 @@ header #up{background:var(--acc);border-color:var(--acc);color:#1b1f24;font-weig
 .tile svg{width:24px;height:24px;stroke:#fff;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .t1{background:linear-gradient(#26c900 40%,#0f6100)}.t2{background:linear-gradient(#0050f0 40%,#00308f)}
 header #home{background:transparent;color:#fff;border-color:#ffffff88}
+#gate{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px}
+#gate .box{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:28px 24px;max-width:420px;width:100%;text-align:center;display:grid;gap:14px;justify-items:center}
+#gate img{width:96px;height:96px;border-radius:12px;background:#fff}
+#gate h1{font-size:20px;margin:0}#gmsg{color:var(--mut);font-size:14px;min-height:20px}
+#glogin{display:flex;align-items:center;gap:10px;padding:10px 18px;font-weight:600}
 </style>
 
 <style>
@@ -107,6 +112,9 @@ header #home{background:transparent;color:#fff;border-color:#ffffff88}
 .img img{width:100%!important;height:100%!important;object-fit:contain!important;object-position:center!important;display:block!important;background:#fff!important}
 </style></head>
 <body>
+<div id="gate"><div class="box"><img id="glogo" alt="FUMEC"><h1>Sistemas de Catálogo</h1><div class="sub">FUMEC · Fundação Municipal para Educação Comunitária</div>
+<div id="gmsg">Verificando acesso…</div>
+<button id="glogin" style="display:none"><svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17.5z"/><path fill="#FBBC05" d="M10.5 28.7a14.5 14.5 0 0 1 0-9.4l-7.9-6.1a24 24 0 0 0 0 21.6l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.9 2.3-8.4 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/></svg>Entrar com Google</button></div></div>
 <div id="portal"><div class="wrap">
 <header><div class="lg"><img id="plogo" alt="FUMEC"><div><h1>Sistemas de Catálogo</h1><div class="sub">FUMEC · Fundação Municipal para Educação Comunitária</div></div></div></header>
 <div class="tg" style="margin-top:16px">
@@ -154,7 +162,7 @@ const esc=s=>String(s??"").replace(/[&<>\"']/g,c=>({"&":"&amp;","<":"&lt;",">":"
 const SUPABASE_URL="https://arkmnzmzhimgtrdiygcf.supabase.co";
 const SUPABASE_KEY="sb_publishable_O7Ez-YYc_sC_Mny0YndeZQ_ZN_DpYA6";
 const {createClient}=window.supabase;
-const sb=createClient(SUPABASE_URL,SUPABASE_KEY);
+const sb=createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{flowType:"pkce",detectSessionInUrl:true,persistSession:true}});
 const SYSTEMS={
   consumo:{titulo:"Catálogo de Itens de Consumo",est:[["central","Almoxarifado Central"],["ceprocamp","Almoxarifado Ceprocamp"]],hint:document.querySelector(".hint").innerHTML},
   permanentes:{titulo:"Catálogo de Bens Permanentes",est:[["bens","Bens Permanentes"]],semCodigo:true,
@@ -218,12 +226,37 @@ async function loadData(){
 
   render();
 }
-async function init(){
-  try{const {data:{session}}=await sb.auth.getSession();admin=!!session}catch(e){admin=false}
-  applyMode();
+const DOM="educa.fumec.sp.gov.br";
+let userEmail="",started=false;
+function gate(msg,btn){$("#gate").style.display="flex";$("#gmsg").textContent=msg||"";$("#glogin").style.display=btn?"flex":"none"}
+async function checkAdmin(email){try{const {data,error}=await sb.from("admins").select("email").eq("email",email).maybeSingle();return !error&&!!data}catch(e){return false}}
+async function applySession(session){
+  if(!session){userEmail="";admin=false;gate(`Acesso restrito aos servidores da FUMEC. Entre com seu e-mail @${DOM}.`,true);return false}
+  const email=(session.user?.email||"").toLowerCase();
+  if(!email.endsWith("@"+DOM)){await sb.auth.signOut();userEmail="";admin=false;gate(`O e-mail ${email||"informado"} não pertence ao domínio @${DOM}. Entre com a conta corporativa.`,true);return false}
+  userEmail=email;admin=await checkAdmin(email);$("#gate").style.display="none";return true
+}
+async function start(){
+  if(started){try{await loadData()}catch(e){}render();return}
+  started=true;applyMode();
   try{await loadData()}catch(e){$("#list").innerHTML=`<div class="empty">Não foi possível carregar o banco de dados: ${esc(e.message||e)}</div>`;toast("Erro ao carregar o catálogo.")}
   sb.channel("catalogo-itens").on("postgres_changes",{event:"*",schema:"public",table:"itens"},()=>loadData().catch(()=>{})).on("postgres_changes",{event:"*",schema:"public",table:"importacoes"},()=>loadData().catch(()=>{})).subscribe();
-  sb.auth.onAuthStateChange((_event,session)=>{admin=!!session;render()});
+}
+$("#glogin").onclick=async()=>{
+  try{sessionStorage.setItem("rt",location.hash||"")}catch(e){}
+  gate("Abrindo o login do Google…",false);
+  const {error}=await sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:location.origin+location.pathname,queryParams:{hd:DOM,prompt:"select_account"}}});
+  if(error)gate("Não foi possível iniciar o login: "+error.message,true);
+};
+async function init(){
+  $("#glogo").src=document.querySelector("#app header img").src;
+  let ok=false;
+  try{const {data:{session}}=await sb.auth.getSession();ok=await applySession(session)}catch(e){gate("Não foi possível verificar o acesso: "+(e.message||e),true)}
+  sb.auth.onAuthStateChange((ev,session)=>setTimeout(async()=>{
+    if(ev==="SIGNED_OUT"){items=[];imps={};await applySession(null);render();return}
+    if(ev==="SIGNED_IN"||ev==="USER_UPDATED"){const o=await applySession(session);if(o)await start();else render()}
+  },0));
+  if(ok){try{const rt=sessionStorage.getItem("rt");if(rt){sessionStorage.removeItem("rt");if(!location.hash||location.hash==="#/")location.hash=rt}}catch(e){}fromHash();await start()}
 }
 function render(){
   applyMode();const imp=imps[est],cur=items.filter(i=>i.estoque===est&&(admin?true:disp(i))),tot=cur.length,dp=cur.filter(disp).length;
@@ -256,13 +289,13 @@ function applyMode(){
   ["#upimg","#up",".hint",'[data-f="desat"]','[data-f="indisp"]'].forEach(q=>
     document.querySelectorAll(q).forEach(e=>e.style.display=admin?"":"none")
   );
-  $("#adm").textContent=admin?"Sair do modo admin":"🔒 Administrador";
+  $("#adm").textContent=(userEmail?userEmail+(admin?" (admin)":"")+" · ":"")+"Sair";
   if(!admin&&(filt==="desat"||filt==="indisp")){
     filt="todos";
     document.querySelectorAll(".tabs button").forEach(x=>x.classList.toggle("on",x.dataset.f==="todos"));
   }
 }
-$("#adm").onclick=async()=>{if(admin){await sb.auth.signOut();return}$("#pt").textContent="Acesso do administrador";$("#pl").textContent="E-mail";$("#po").textContent="Entrar";$("#pi").type="email";$("#pi").value="";$("#pw").classList.add("on");$("#pi").focus()};
+$("#adm").onclick=async()=>{await sb.auth.signOut()};
 $("#pc").onclick=()=>$("#pw").classList.remove("on");
 $("#pi").onkeydown=e=>{if(e.key==="Enter")$("#po").click()};
 $("#po").onclick=async()=>{const email=$("#pi").value.trim();if(!email)return toast("Informe o e-mail.");const pass=prompt("Digite a senha do administrador:");if(pass===null)return;try{const {error}=await sb.auth.signInWithPassword({email,password:pass});if(error)throw error;$("#pw").classList.remove("on");toast("Modo administrador ativado.")}catch(e){toast("Login não realizado: "+(e.message||e.error_description||e))}};
@@ -300,7 +333,7 @@ async function importCsv(file){
   toast(`Lendo a planilha “${file.name}”…`,60000);
   try{
     const {data:{session}}=await sb.auth.getSession();
-    if(!session){toast("Sua sessão de administrador não está ativa. Faça login novamente.",12000);return}
+    if(!session||!admin){toast("Apenas administradores podem fazer esta ação.",12000);return}
 
     const buf=await file.arrayBuffer(),u=new Uint8Array(buf);
     let rows;
@@ -468,7 +501,7 @@ const kf=t=>SYS.semCodigo?norm(t):String(t).trim().toLowerCase();
 async function importImgs(files){
   const by=new Map();items.filter(i=>ESTK().includes(i.estoque)).forEach(i=>{const k=kf(i.codigo);if(!by.has(k))by.set(k,[]);by.get(k).push(i)});const jobs=[],sem=[];let ok=0,fail=0;const erros=[];
   const {data:{session}}=await sb.auth.getSession();
-  if(!session){toast("Sua sessão de administrador não está ativa. Faça login novamente.",12000);return}
+  if(!session||!admin){toast("Apenas administradores podem fazer esta ação.",12000);return}
   for(const f of files){if(!f.type.startsWith("image/")){fail++;erros.push(`${f.name}: arquivo não reconhecido como imagem`);continue}const m=by.get(kf(f.name.replace(/\.[^.]+$/,"")));if(m)jobs.push([f,m]);else sem.push(f.name)}
   for(let i=0;i<jobs.length;i+=3){
     toast(`Padronizando e enviando imagens… ${i}/${jobs.length}`,60000);

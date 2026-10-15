@@ -141,7 +141,7 @@ header #home,header #logbtn{background:transparent;color:#fff;border-color:#ffff
   <input type="password" id="pi" autocomplete="current-password"><div class="row"><button id="pc">Cancelar</button><button class="pri" id="po">Entrar</button></div></div></div>
 <div class="ovl" id="alog"><div class="mod" style="max-width:760px;max-height:85vh;grid-template-rows:auto auto 1fr auto">
   <b>Log de acessos</b>
-  <div style="display:flex;gap:8px;flex-wrap:wrap"><input id="alq" type="search" placeholder="Filtrar por e-mail…" style="flex:1;min-width:160px"><button id="alv">Ver resumo por e-mail</button></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap"><input id="alq" type="search" placeholder="Filtrar por e-mail…" style="flex:1;min-width:160px"><select id="alc2" style="background:var(--card);color:var(--tx);border:1px solid var(--bd);border-radius:8px;padding:7px 8px;font:inherit"><option value="">Todos os catálogos</option><option value="consumo">Catálogo de Itens de Consumo</option><option value="permanentes">Catálogo de Bens Permanentes</option><option value="inicio">Tela inicial</option></select><button id="alv">Ver resumo por e-mail</button></div>
   <div id="alb" style="overflow:auto"></div>
   <div class="row"><span id="alc" class="sub" style="margin-right:auto"></span><button id="alx">Baixar CSV</button><button id="alf" class="pri">Fechar</button></div></div></div>
 <div class="ovl" id="lst"><div class="mod" style="max-width:760px;max-height:85vh;grid-template-rows:auto 1fr auto"><b id="lt"></b><div class="ph" id="ph"></div><div id="lb" style="overflow:auto"></div><div class="row"><button id="lp" class="pri">🖨 Imprimir / salvar relatório</button><button id="lc">Fechar</button></div></div></div>
@@ -189,6 +189,7 @@ function apply(){
   $("#portal").style.display=cur?"none":"block";$("#app").style.display=cur?"block":"none";
   document.title=(cur?SYSTEMS[cur].titulo:"Sistemas de Catálogo")+" — FUMEC";
   if(cur&&SYS!==SYSTEMS[cur]){SYS=SYSTEMS[cur];est=SYS.est[0][0];applySys()}
+  if(userEmail)registrarAcesso(userEmail,cur);
   render();window.scrollTo(0,0);
 }
 function go(k){cur=SYSTEMS[k]?k:null;try{location.hash=cur?"#/"+cur:"#/"}catch(e){}apply()}
@@ -240,7 +241,7 @@ async function applySession(session){
   if(!session){userEmail="";admin=false;gate(`Acesso restrito aos servidores da FUMEC. Entre com seu e-mail @${DOM}.`,true);return false}
   const email=(session.user?.email||"").toLowerCase();
   if(!email.endsWith("@"+DOM)){await sb.auth.signOut();userEmail="";admin=false;gate(`O e-mail ${email||"informado"} não pertence ao domínio @${DOM}. Entre com a conta corporativa.`,true);return false}
-  userEmail=email;admin=await checkAdmin(email);$("#gate").style.display="none";registrarAcesso(email);return true
+  userEmail=email;admin=await checkAdmin(email);$("#gate").style.display="none";registrarAcesso(email,cur);return true
 }
 async function start(){
   if(started){try{await loadData()}catch(e){}render();return}
@@ -292,28 +293,33 @@ $("#stats").addEventListener("click",e=>{const b=e.target.closest("[data-l]");if
 $("#lp").onclick=()=>{if(!relat||!relat.l.length)return toast("Não há itens para imprimir.");window.print()};
 $("#lc").onclick=()=>$("#lst").classList.remove("on");
 /* ---------- Log de acessos ---------- */
-function registrarAcesso(email){
+const CATN={consumo:"Catálogo de Itens de Consumo",permanentes:"Catálogo de Bens Permanentes",inicio:"Tela inicial"};
+function registrarAcesso(email,cat){
+  cat=CATN[cat]&&cat!=="inicio"?cat:"inicio";
   try{
-    const k="acesso_"+email,ult=Number(localStorage.getItem(k)||0);
+    const k="acesso_"+email+"_"+cat,ult=Number(localStorage.getItem(k)||0);
     if(Date.now()-ult<30*60*1000)return;
     localStorage.setItem(k,String(Date.now()));
   }catch(e){}
-  sb.from("acessos").insert({email}).then(()=>{},()=>{});
+  sb.from("acessos").insert({email,catalogo:cat}).then(()=>{},()=>{});
 }
 let alRows=[],alResumo=false;
 const fdh=d=>new Date(d).toLocaleString("pt-BR",{timeZone:"America/Sao_Paulo"});
+const alCat=r=>r.catalogo?(CATN[r.catalogo]||r.catalogo):"—";
+function alFiltrar(){
+  const q=$("#alq").value.trim().toLowerCase(),c=$("#alc2").value;
+  return alRows.filter(r=>(!q||r.email.toLowerCase().includes(q))&&(!c||r.catalogo===c))}
 function alRender(){
-  const q=$("#alq").value.trim().toLowerCase();
-  const rows=alRows.filter(r=>!q||r.email.toLowerCase().includes(q));
+  const rows=alFiltrar();
   let h;
   if(alResumo){
     const m=new Map();
-    rows.forEach(r=>{const o=m.get(r.email)||{email:r.email,n:0,ult:r.criado_em};o.n++;if(r.criado_em>o.ult)o.ult=r.criado_em;m.set(r.email,o)});
+    rows.forEach(r=>{const k=r.email+"|"+(r.catalogo||"");const o=m.get(k)||{email:r.email,cat:alCat(r),n:0,ult:r.criado_em};o.n++;if(r.criado_em>o.ult)o.ult=r.criado_em;m.set(k,o)});
     const l=[...m.values()].sort((a,b)=>b.ult.localeCompare(a.ult));
-    h=`<table class="lg2"><thead><tr><th>E-mail</th><th>Último acesso</th><th>Acessos</th></tr></thead><tbody>${l.map(o=>`<tr><td>${esc(o.email)}</td><td>${esc(fdh(o.ult))}</td><td>${o.n}</td></tr>`).join("")}</tbody></table>`;
-    $("#alc").textContent=`${l.length} e-mail(s)`;
+    h=`<table class="lg2"><thead><tr><th>E-mail</th><th>Catálogo</th><th>Último acesso</th><th>Acessos</th></tr></thead><tbody>${l.map(o=>`<tr><td>${esc(o.email)}</td><td>${esc(o.cat)}</td><td>${esc(fdh(o.ult))}</td><td>${o.n}</td></tr>`).join("")}</tbody></table>`;
+    $("#alc").textContent=`${l.length} linha(s) no resumo`;
   }else{
-    h=`<table class="lg2"><thead><tr><th>Data e horário</th><th>E-mail</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(fdh(r.criado_em))}</td><td>${esc(r.email)}</td></tr>`).join("")}</tbody></table>`;
+    h=`<table class="lg2"><thead><tr><th>Data e horário</th><th>E-mail</th><th>Catálogo acessado</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(fdh(r.criado_em))}</td><td>${esc(r.email)}</td><td>${esc(alCat(r))}</td></tr>`).join("")}</tbody></table>`;
     $("#alc").textContent=`${rows.length} registro(s)`;
   }
   $("#alb").innerHTML=rows.length?h:'<div class="empty">Nenhum registro encontrado.</div>';
@@ -321,17 +327,17 @@ function alRender(){
 }
 $("#logbtn").onclick=async()=>{
   if(!admin)return;
-  $("#alq").value="";alResumo=false;$("#alb").innerHTML='<div class="empty">Carregando…</div>';$("#alc").textContent="";$("#alog").classList.add("on");
-  const {data,error}=await sb.from("acessos").select("email,criado_em").order("criado_em",{ascending:false}).limit(2000);
+  $("#alq").value="";$("#alc2").value="";alResumo=false;$("#alb").innerHTML='<div class="empty">Carregando…</div>';$("#alc").textContent="";$("#alog").classList.add("on");
+  const {data,error}=await sb.from("acessos").select("email,criado_em,catalogo").order("criado_em",{ascending:false}).limit(2000);
   if(error){$("#alb").innerHTML=`<div class="empty">Não foi possível carregar o log: ${esc(error.message)}</div>`;return}
   alRows=data||[];alRender();
 };
-$("#alq").oninput=alRender;
+$("#alq").oninput=alRender;$("#alc2").onchange=alRender;
 $("#alv").onclick=()=>{alResumo=!alResumo;alRender()};
 $("#alf").onclick=()=>$("#alog").classList.remove("on");
 $("#alx").onclick=()=>{
-  const q=$("#alq").value.trim().toLowerCase(),rows=alRows.filter(r=>!q||r.email.toLowerCase().includes(q));
-  const csv="\uFEFFdata_hora;email\n"+rows.map(r=>`${fdh(r.criado_em)};${r.email}`).join("\n");
+  const rows=alFiltrar();
+  const csv="\uFEFFdata_hora;email;catalogo\n"+rows.map(r=>`${fdh(r.criado_em)};${r.email};${alCat(r)}`).join("\n");
   const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
   a.download=`log-acessos-${new Date().toISOString().slice(0,10)}.csv`;document.body.appendChild(a);a.click();a.remove();
 };

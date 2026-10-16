@@ -578,7 +578,7 @@ async function importImgs(files){
       try{
         
         for(const it of m){
-          const path=`${it._id}/${f.name.replace(/[^A-Za-z0-9._-]/g,"_")}`;
+          const path=`${it._id}/${Date.now()}-${f.name.replace(/[^A-Za-z0-9._-]/g,"_")}`;
           const up=await sb.storage.from("imagens").upload(path,f,{upsert:true,cacheControl:"31536000"});
           if(up.error)throw new Error(`Storage (${up.error.statusCode||"erro"}): ${up.error.message||up.error.error||up.error}`);
           const {data}=sb.storage.from("imagens").getPublicUrl(path);if(!data?.publicUrl)throw new Error("Não foi possível obter a URL pública da imagem.");
@@ -588,7 +588,7 @@ async function importImgs(files){
       }catch(e){fail++;erros.push(`${f.name}: ${e.message||e}`)}
     }));
   }
-  await loadData();let msg=`${ok} imagem(ns) atualizada(s) e padronizada(s) em 1200×900 px`;if(sem.length)msg+=` · ${sem.length} sem cadastro com esse código (ex.: ${sem.slice(0,3).join(", ")})`;if(erros.length)msg+=` · ${fail} com falha: ${erros.slice(0,2).join(" | ")}`;toast(msg,18000)
+  await loadData();let msg=`${ok} imagem(ns) atualizada(s)`;if(sem.length)msg+=` · ${sem.length} sem cadastro com esse código (ex.: ${sem.slice(0,3).join(", ")})`;if(erros.length)msg+=` · ${fail} com falha: ${erros.slice(0,2).join(" | ")}`;toast(msg,18000)
 }
 
 $("#upimg").onclick=()=>$("#imgs").click();

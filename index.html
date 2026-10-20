@@ -86,6 +86,8 @@ header #up{background:var(--acc);border-color:var(--acc);color:#1b1f24;font-weig
   #lt{display:block!important;width:100%!important;font-size:15px!important;line-height:1.2!important;margin-bottom:5px!important;overflow-wrap:anywhere!important}
 }
 .act .dng{grid-column:1/-1;color:var(--no);border-color:var(--no)}
+.avi{display:flex;gap:8px;align-items:center;background:#FFF4E0;color:#7A4B00;border:1px solid #F39200;border-radius:10px;padding:9px 12px;font-size:13px;margin:0 0 14px}
+@media (prefers-color-scheme:dark){.avi{background:#3A2A0A;color:#FFD08A}}
 .hint{font-size:12.5px;color:var(--mut);margin:-8px 0 16px}
 .tg{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:4px}
 .tile{height:180px;border-radius:4px;border:1px solid #ddd;color:#fff;text-decoration:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;font-size:16px;text-align:center;padding:12px;cursor:pointer}
@@ -134,6 +136,7 @@ header #home,header #logbtn,header #pvbtn{background:transparent;color:#fff;bord
 <div class="stk" id="stk"><button data-s="central" class="on">Almoxarifado Central</button><button data-s="ceprocamp">Almoxarifado Ceprocamp</button></div>
 <div class="stats" id="stats"></div>
 <div class="hint">Imagens: use o nome do arquivo igual ao código do item (ex.: <b>1234.jpg</b>). Um único arquivo alimenta os dois almoxarifados: <b>NOME_ALMOX</b> define o estoque (Central ou Ceprocamp), <b>COD_REDUZIDO</b> o código, <b>DESCR_PRODUTO</b> o nome e <b>QT_ATUAL</b> a quantidade (somada se o código repetir no mesmo estoque). Só o que mudou é sobrescrito; imagem e status ativo/inativo são preservados.</div>
+<div class="avi" role="note"><span aria-hidden="true">ℹ️</span><span><b>Atenção:</b> as imagens exibidas neste catálogo são apenas <b>ilustrativas</b> e podem diferir do item real.</span></div>
 <div class="bar">
   <input type="search" id="q" placeholder="Buscar por nome, código ou descrição…">
   <span class="tabs"><button data-f="todos" class="on">Todos</button> <button data-f="disp">Disponíveis</button> <button data-f="indisp">Indisponíveis</button> <button data-f="desat">Desativados</button></span>

@@ -140,7 +140,7 @@ header #home,header #logbtn,header #pvbtn{background:transparent;color:#fff;bord
 <div class="avi" role="note"><span aria-hidden="true">ℹ️</span><span><b>Atenção:</b> as imagens exibidas neste catálogo são apenas <b>ilustrativas</b> e podem diferir do item real.</span></div>
 <div class="bar">
   <input type="search" id="q" placeholder="Buscar por nome, código ou descrição…">
-  <span class="tabs"><button data-f="todos" class="on">Todos</button> <button data-f="disp">Disponíveis</button> <button data-f="indisp">Indisponíveis</button> <button data-f="desat">Desativados</button></span>
+  <span class="tabs"><button data-f="todos" class="on">Todos</button> <button data-f="disp">Disponíveis</button> <button data-f="indisp">Indisponíveis</button> <button data-f="novo" class="est" style="display:none">Novos</button> <button data-f="usado" class="est" style="display:none">Usados</button> <button data-f="desat">Desativados</button></span>
 </div>
 <div id="list"></div>
 </div></div>
@@ -195,6 +195,7 @@ function applySys(){
   document.querySelectorAll("#stk button").forEach(b=>b.classList.toggle("on",b.dataset.s===est));
   filt="todos";term="";$("#q").value="";
   document.querySelectorAll(".tabs button").forEach(x=>x.classList.toggle("on",x.dataset.f==="todos"));
+  document.querySelectorAll(".tabs .est").forEach(e=>e.style.display=SYS.semCodigo?"":"none");
   document.querySelector(".hint").innerHTML=SYS.hint;
 }
 function apply(){
@@ -282,7 +283,7 @@ function render(){
   const st=(v,l,c="",k="")=>admin&&k&&Number(v)>0?`<button class="st ${c} clk" data-l="${k}"><b>${v}</b><span>${l} ›</span></button>`:`<div class="st ${c}"><b>${v}</b><span>${l}</span></div>`;
   $("#stats").innerHTML=st(tot,admin&&SYS.est.length>1?"Itens neste almoxarifado":"Itens no catálogo")+st(dp,"Disponíveis","g")+(admin?st(tot-dp,"Indisponíveis","r")+st(imp?imp.novos:"–","Novos na última importação","g","n")+st(imp?items.filter(i=>i.estoque===est&&mesmaImp(i,imp)&&entrada(i)).length:"–","Entradas: novos, reabastecidos ou com aumento","g","e")+st(imp?imp.zerados:"–","Zeraram na última importação","r","z")+st(imp?items.filter(i=>i.estoque===est&&mesmaImp(i,imp)&&saidaSemZerar(i)).length:"–","Saídas sem zerar o saldo","","s")+st(imp?(Number(imp.alterados)||0)+(Number(imp.novos)||0):"–","Itens alterados (inclui novos)","","a"):"");
   $("#last").textContent=!imp?"Nenhuma importação realizada ainda":admin?`Última importação: ${new Date(imp.data).toLocaleString("pt-BR")} · ${imp.arquivo||""} · ${imp.total} linhas`:`Atualizado em ${new Date(imp.data).toLocaleString("pt-BR")}`;
-  const t=term.toLowerCase();const l=cur.filter(i=>{if(t&&!`${i.nome} ${i.codigo} ${i.descricao}`.toLowerCase().includes(t))return false;if(filt==="disp")return disp(i);if(filt==="indisp")return !disp(i)&&i.ativo!==false;if(filt==="desat")return i.ativo===false;return true});
+  const t=term.toLowerCase();const l=cur.filter(i=>{if(t&&!`${i.nome} ${i.codigo} ${i.descricao}`.toLowerCase().includes(t))return false;if(filt==="disp")return disp(i);if(filt==="indisp")return !disp(i)&&i.ativo!==false;if(filt==="desat")return i.ativo===false;if(filt==="novo")return estBem(i.codigo)==="NOVOS";if(filt==="usado")return estBem(i.codigo)==="USADOS";return true});
   if(!l.length){$("#list").innerHTML=`<div class="empty">${cur.length?"Nenhum item encontrado.":"Catálogo vazio. Importe a planilha para começar."}</div>`;return}
   $("#list").innerHTML='<div class="grid">'+l.map(i=>{const d=disp(i),off=i.ativo===false;return `<div class="card ${off?"off":""}"><div class="img"><img loading="lazy" src="${esc(i.imagem||ph(i.nome))}" alt="" onerror="this.src='${ph(i.nome)}'"><span class="tag ${d?"ok":"no"}">${d?"Disponível":"Indisponível"}</span>${off&&admin?'<span class="tag dz">Desativado</span>':""}${SYS.semCodigo&&estBem(i.codigo)?`<span class="tag es ${estBem(i.codigo)==="NOVOS"?"nv":"us"}">${estBem(i.codigo)==="NOVOS"?"Novo":"Usado"}</span>`:""}</div><div class="body">${SYS.semCodigo?"":`<div class="cod">Cód. ${esc(i.codigo)}</div>`}<div class="nm">${esc(i.nome)}</div><div class="ds">${esc(i.descricao)||"Sem descrição"}</div>${admin?`<div class="qt">Quantidade: <b>${Number(i.quantidade)||0}</b></div>`:""}</div>${admin?`<div class="act" data-id="${esc(i._id)}"><button data-a="tog">${off?"Ativar":"Desativar"}</button><button data-a="qtd">Indisponível</button><button data-a="img">Alterar imagem</button><button data-a="edit">Editar</button><button data-a="del" class="dng">Excluir item</button></div>`:""}</div>`}).join("")+"</div>";
 }

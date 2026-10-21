@@ -37,6 +37,7 @@ input,textarea{font:inherit;color:var(--tx);background:var(--card);border:1px so
 .img img{width:100%;height:100%;object-fit:contain;display:block;background:#fff}
 .tag{position:absolute;top:8px;left:8px;font-size:12px;font-weight:600;padding:3px 9px;border-radius:99px}
 .tag.ok{background:var(--okb);color:var(--ok)}.tag.no{background:var(--nob);color:var(--no)}
+.tag.es{left:auto;right:8px;border-radius:6px;color:#fff;letter-spacing:.3px;text-transform:uppercase;font-size:11px}.tag.es.nv{background:#0B4A9A}.tag.es.us{background:#B35F00}.tag.dz+.tag.es{top:36px}
 .tag.dz{left:auto;right:8px;background:#222;color:#fff}
 .body{padding:12px;flex:1}
 .cod{font-size:12px;color:var(--mut)}
@@ -183,7 +184,7 @@ const sb=createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{flowType:"pkce",detectSes
 const SYSTEMS={
   consumo:{titulo:"Catálogo de Itens de Consumo",est:[["central","Almoxarifado Central"],["ceprocamp","Almoxarifado Ceprocamp"]],hint:document.querySelector(".hint").innerHTML},
   permanentes:{titulo:"Catálogo de Bens Permanentes",est:[["bens","Bens Permanentes"]],semCodigo:true,
-    hint:'Planilha com duas colunas: <b>DESCR_BEM</b> (descrição do bem) e <b>QTDE</b> (quantidade). Não há código: a descrição identifica o bem (linhas repetidas têm as quantidades somadas; se a descrição mudar, o bem é tratado como novo). Imagens: o nome do arquivo deve ser igual à descrição do bem (ignora acentos, maiúsculas e pontuação).'}};
+    hint:'Planilha com várias colunas; só são usadas <b>DESCR_BEM</b> e <b>NOME_UNIDADE</b>. Cada linha vale 1 unidade: a quantidade é o número de linhas do mesmo bem (tudo a partir de <b>N/S</b> na descrição é ignorado). <b>NOVOS</b> ou <b>USADOS</b> em NOME_UNIDADE separa o estado do bem e aparece no canto da foto. Não há código: a descrição + estado identificam o bem. Imagens: o nome do arquivo deve ser igual à descrição do bem (ignora acentos, maiúsculas e pontuação).'}};
 let SYS=SYSTEMS.consumo,cur=null;
 const ESTK=()=>SYS.est.map(e=>e[0]);
 const NOMES=new Proxy({},{get:(_,k)=>(SYS.est.find(e=>e[0]===k)||[0,String(k)])[1]});
@@ -283,7 +284,7 @@ function render(){
   $("#last").textContent=!imp?"Nenhuma importação realizada ainda":admin?`Última importação: ${new Date(imp.data).toLocaleString("pt-BR")} · ${imp.arquivo||""} · ${imp.total} linhas`:`Atualizado em ${new Date(imp.data).toLocaleString("pt-BR")}`;
   const t=term.toLowerCase();const l=cur.filter(i=>{if(t&&!`${i.nome} ${i.codigo} ${i.descricao}`.toLowerCase().includes(t))return false;if(filt==="disp")return disp(i);if(filt==="indisp")return !disp(i)&&i.ativo!==false;if(filt==="desat")return i.ativo===false;return true});
   if(!l.length){$("#list").innerHTML=`<div class="empty">${cur.length?"Nenhum item encontrado.":"Catálogo vazio. Importe a planilha para começar."}</div>`;return}
-  $("#list").innerHTML='<div class="grid">'+l.map(i=>{const d=disp(i),off=i.ativo===false;return `<div class="card ${off?"off":""}"><div class="img"><img loading="lazy" src="${esc(i.imagem||ph(i.nome))}" alt="" onerror="this.src='${ph(i.nome)}'"><span class="tag ${d?"ok":"no"}">${d?"Disponível":"Indisponível"}</span>${off&&admin?'<span class="tag dz">Desativado</span>':""}</div><div class="body">${SYS.semCodigo?"":`<div class="cod">Cód. ${esc(i.codigo)}</div>`}<div class="nm">${esc(i.nome)}</div><div class="ds">${esc(i.descricao)||"Sem descrição"}</div>${admin?`<div class="qt">Quantidade: <b>${Number(i.quantidade)||0}</b></div>`:""}</div>${admin?`<div class="act" data-id="${esc(i._id)}"><button data-a="tog">${off?"Ativar":"Desativar"}</button><button data-a="qtd">Indisponível</button><button data-a="img">Alterar imagem</button><button data-a="edit">Editar</button><button data-a="del" class="dng">Excluir item</button></div>`:""}</div>`}).join("")+"</div>";
+  $("#list").innerHTML='<div class="grid">'+l.map(i=>{const d=disp(i),off=i.ativo===false;return `<div class="card ${off?"off":""}"><div class="img"><img loading="lazy" src="${esc(i.imagem||ph(i.nome))}" alt="" onerror="this.src='${ph(i.nome)}'"><span class="tag ${d?"ok":"no"}">${d?"Disponível":"Indisponível"}</span>${off&&admin?'<span class="tag dz">Desativado</span>':""}${SYS.semCodigo&&estBem(i.codigo)?`<span class="tag es ${estBem(i.codigo)==="NOVOS"?"nv":"us"}">${estBem(i.codigo)==="NOVOS"?"Novo":"Usado"}</span>`:""}</div><div class="body">${SYS.semCodigo?"":`<div class="cod">Cód. ${esc(i.codigo)}</div>`}<div class="nm">${esc(i.nome)}</div><div class="ds">${esc(i.descricao)||"Sem descrição"}</div>${admin?`<div class="qt">Quantidade: <b>${Number(i.quantidade)||0}</b></div>`:""}</div>${admin?`<div class="act" data-id="${esc(i._id)}"><button data-a="tog">${off?"Ativar":"Desativar"}</button><button data-a="qtd">Indisponível</button><button data-a="img">Alterar imagem</button><button data-a="edit">Editar</button><button data-a="del" class="dng">Excluir item</button></div>`:""}</div>`}).join("")+"</div>";
 }
 async function upd(id,data,msg){try{const {error}=await sb.from("itens").update(data).eq("id",id);if(error)throw error;if(msg)toast(msg);await loadData()}catch(e){toast("Não foi possível salvar: "+(e.message||e.code))}}
 $("#list").addEventListener("click",e=>{const b=e.target.closest("button[data-a]");if(!b)return;const id=b.parentElement.dataset.id,it=items.find(x=>x._id===id);if(!it)return;const a=b.dataset.a;if(a==="tog")upd(id,{ativo:it.ativo===false},it.ativo===false?"Item ativado":"Item desativado");else if(a==="qtd"){if(!(Number(it.quantidade)>0))toast("Este item já está indisponível (quantidade 0).");else{ivId=id;$("#ivn").textContent=`${SYS.semCodigo?"":it.codigo+" — "}${it.nome}`;$("#ivq").textContent=Number(it.quantidade)||0;$("#iv").classList.add("on")}}else if(a==="img"){imgId=id;$("#imgin").click()}else if(a==="del"){delId=id;$("#dn").textContent=`${it.codigo} — ${it.nome}`;$("#dl").classList.add("on")}else openMod(it,a)});
@@ -464,9 +465,10 @@ async function importCsv(file){
     const iN=col(["descrbem","descrproduto","nome","produto","item","bem"]);
     const iQ=col(["qtatual","quantidade","qtd","qtde","estoque","saldo"]);
     const iA=col(["nomealmox","almoxarifado"]);
+    const iU=col(["nomeunidade"]);
 
     if(iN<0||(!SYS.semCodigo&&iC<0)||(SYS.est.length>1&&iA<0)){
-      toast(SYS.semCodigo?"A planilha precisa ter as colunas DESCR_BEM e QTDE.":"A planilha precisa ter as colunas COD_REDUZIDO, DESCR_PRODUTO e NOME_ALMOX.",12000);
+      toast(SYS.semCodigo?"A planilha precisa ter a coluna DESCR_BEM.":"A planilha precisa ter as colunas COD_REDUZIDO, DESCR_PRODUTO e NOME_ALMOX.",12000);
       return;
     }
 
@@ -476,17 +478,27 @@ async function importCsv(file){
       const k=SYS.est.length===1?ESTK()[0]:stockOf(almox);
       if(!k){ignoradas.push({almox,codigo:String(r[iC]??"").trim()});continue}
 
-      const cod=SYS.semCodigo?fx(r[iN]).replace(/\s+/g," "):fx(r[iC]);
+      let nome=fx(r[iN]),cod,quantidade;
+      if(SYS.semCodigo){
+        // Bens: cada linha = 1 unidade. Tudo a partir de "N/S" (nº de série) é ignorado.
+        nome=nome.replace(/\s+/g," ").trim();
+        const m=nome.search(/\bN\s*\/\s*S\b/i);
+        if(m>=0)nome=nome.slice(0,m).replace(/[\s\-–:;,.]+$/,"").trim();
+        const u=iU>=0?norm(r[iU]):"";
+        const est=u.includes("usad")?"USADOS":u.includes("novo")?"NOVOS":"";
+        cod=nome?nome+"|"+est:"";
+        quantidade=1;
+      }else{
+        cod=fx(r[iC]);
+        quantidade=iQ>=0?num(r[iQ]):0;
+      }
       if(!cod){ignoradas.push({almox,codigo:"(sem código)"});continue}
-
-      const nome=fx(r[iN]);
-      const quantidade=iQ>=0?num(r[iQ]):0;
 
       // Se o mesmo código aparecer duas vezes no mesmo almoxarifado,
       // somamos as quantidades, em vez de perder uma das linhas.
       const existente=grupos[k].get(cod);
       if(existente) existente.quantidade+=quantidade;
-      else grupos[k].set(cod,{codigo:cod,nome:nome||cod,quantidade});
+      else grupos[k].set(cod,{codigo:cod,nome:nome||cod.split("|")[0],quantidade});
     }
 
     const reconhecidas=Object.values(grupos).reduce((a,m)=>a+m.size,0);
@@ -599,9 +611,10 @@ async function importCsv(file){
 }
 
 function idHash(k,c){let h=2166136261;for(const ch of c){h^=ch.codePointAt(0);h=Math.imul(h,16777619)>>>0}return docId(k+"_"+c.slice(0,60))+"_"+h.toString(16)}
+const cdesc=c=>String(c??"").split("|")[0],estBem=c=>{const e=String(c??"").split("|")[1];return e==="NOVOS"||e==="USADOS"?e:""};
 const kf=t=>SYS.semCodigo?norm(t):String(t).trim().toLowerCase();
 async function importImgs(files){
-  const by=new Map();items.filter(i=>ESTK().includes(i.estoque)).forEach(i=>{const k=kf(i.codigo);if(!by.has(k))by.set(k,[]);by.get(k).push(i)});const jobs=[],sem=[];let ok=0,fail=0;const erros=[];
+  const by=new Map();items.filter(i=>ESTK().includes(i.estoque)).forEach(i=>{const k=kf(SYS.semCodigo?cdesc(i.codigo):i.codigo);if(!by.has(k))by.set(k,[]);by.get(k).push(i)});const jobs=[],sem=[];let ok=0,fail=0;const erros=[];
   const {data:{session}}=await sb.auth.getSession();
   if(!session||!admin){toast("Apenas administradores podem fazer esta ação.",12000);return}
   for(const f of files){if(!f.type.startsWith("image/")){fail++;erros.push(`${f.name}: arquivo não reconhecido como imagem`);continue}const m=by.get(kf(f.name.replace(/\.[^.]+$/,"")));if(m)jobs.push([f,m]);else sem.push(f.name)}

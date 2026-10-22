@@ -149,9 +149,12 @@ header #home,header #logbtn,header #pvbtn{background:transparent;color:#fff;bord
   <input type="password" id="pi" autocomplete="current-password"><div class="row"><button id="pc">Cancelar</button><button class="pri" id="po">Entrar</button></div></div></div>
 <div class="ovl" id="alog"><div class="mod" style="max-width:760px;max-height:85vh;grid-template-rows:auto auto 1fr auto">
   <b>Log de acessos</b>
-  <div style="display:flex;gap:8px;flex-wrap:wrap"><input id="alq" type="search" placeholder="Filtrar por e-mail…" style="flex:1;min-width:160px"><select id="alc2" style="background:var(--card);color:var(--tx);border:1px solid var(--bd);border-radius:8px;padding:7px 8px;font:inherit"><option value="">Todos os catálogos</option><option value="consumo">Catálogo de Itens de Consumo</option><option value="permanentes">Catálogo de Bens Permanentes</option><option value="inicio">Tela inicial</option></select><button id="alv">Ver resumo por e-mail</button></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap"><input id="alq" type="search" placeholder="Filtrar por e-mail…" style="flex:1;min-width:160px"><select id="alc2" style="background:var(--card);color:var(--tx);border:1px solid var(--bd);border-radius:8px;padding:7px 8px;font:inherit"><option value="">Todos os catálogos</option><option value="consumo">Catálogo de Itens de Consumo</option><option value="permanentes">Catálogo de Bens Permanentes</option><option value="inicio">Tela inicial</option><option value="acao">Somente ações (apagar / limpar)</option></select><button id="alv">Ver resumo por e-mail</button></div>
   <div id="alb" style="overflow:auto"></div>
-  <div class="row"><span id="alc" class="sub" style="margin-right:auto"></span><button id="alx">Baixar CSV</button><button id="alf" class="pri">Fechar</button></div></div></div>
+  <div class="row"><span id="alc" class="sub" style="margin-right:auto"></span><button id="alx">Baixar CSV</button><button id="alclr" style="color:var(--no)">Limpar histórico</button><button id="alf" class="pri">Fechar</button></div></div></div>
+<div class="ovl" id="alc3"><div class="mod"><b style="color:var(--no)">Limpar histórico do log</b>
+  <div id="alc3m"></div>
+  <div class="row"><button id="alc3x">Cancelar</button><button id="alc3b" class="pri">1) Baixar backup (CSV)</button><button id="alc3k" disabled style="background:var(--no);border-color:var(--no);color:#fff;opacity:.5">2) Limpar histórico</button></div></div></div>
 <div class="ovl" id="lst"><div class="mod" style="max-width:760px;max-height:85vh;grid-template-rows:auto 1fr auto"><b id="lt"></b><div class="ph" id="ph"></div><div id="lb" style="overflow:auto"></div><div class="row"><button id="lp" class="pri">🖨 Imprimir / salvar relatório</button><button id="lc">Fechar</button></div></div></div>
 <div class="ovl" id="da"><div class="mod"><b style="color:var(--no)">Apagar todos os itens</b>
   <div id="dam"></div>
@@ -305,7 +308,9 @@ $("#dai").onkeydown=e=>{if(e.key==="Enter"&&!$("#dak").disabled)$("#dak").click(
 $("#dac").onclick=()=>$("#da").classList.remove("on");
 $("#dak").onclick=async()=>{
   if(!admin||$("#dai").value.trim()!=="APAGAR")return;
-  const k=est,nome=NOMES[k];$("#da").classList.remove("on");toast(`Apagando itens de ${nome}…`,60000);
+  const k=est,nome=NOMES[k],qtd=items.filter(i=>i.estoque===k).length;$("#da").classList.remove("on");toast(`Registrando no log e apagando itens de ${nome}…`,60000);
+  const eLog=await registrarAcao("apagar_todos",`${qtd} item(ns) de ${nome} (${SYS.titulo})`,cur);
+  if(eLog){toast("Nada foi apagado: não foi possível registrar a ação no log ("+(eLog.message||eLog.code||eLog)+"). Rode o SQL da seção 8 no Supabase.",20000);return}
   try{
     const {error}=await sb.from("itens").delete().eq("estoque",k);if(error)throw error;
     const {error:e2}=await sb.from("importacoes").delete().eq("estoque",k);if(e2)throw e2;
@@ -341,23 +346,40 @@ function registrarAcesso(email,cat){
   }catch(e){}
   sb.from("acessos").insert({email,catalogo:cat}).then(()=>{},()=>{});
 }
+async function registrarAcao(acao,detalhe,cat){
+  const {error}=await sb.from("acessos").insert({email:userEmail,catalogo:CATN[cat]?cat:"inicio",acao,detalhe});
+  return error||null;
+}
 let alRows=[],alResumo=false;
+const ACAON={apagar_todos:"⚠ Apagou todos os itens",limpar_log:"🧹 Limpou o histórico do log"};
+async function alCarregar(){
+  let cols="email,criado_em,catalogo,acao,detalhe",out=[];
+  for(let a=0;;a+=1000){
+    let {data,error}=await sb.from("acessos").select(cols).order("criado_em",{ascending:false}).range(a,a+999);
+    if(error&&cols.includes("acao")&&a===0){cols="email,criado_em,catalogo";({data,error}=await sb.from("acessos").select(cols).order("criado_em",{ascending:false}).range(a,a+999))}
+    if(error)throw error;
+    out=out.concat(data||[]);if(!data||data.length<1000)break;
+  }
+  return out;
+}
+const csvDe=rows=>"\uFEFFdata_hora;email;catalogo;acao;detalhe\n"+rows.map(r=>[fdh(r.criado_em),r.email,alCat(r),r.acao?(ACAON[r.acao]||r.acao):"Acesso",r.detalhe||""].map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(";")).join("\n");
+function baixarCsv(rows,nome){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csvDe(rows)],{type:"text/csv;charset=utf-8"}));a.download=nome;document.body.appendChild(a);a.click();a.remove()}
 const fdh=d=>new Date(d).toLocaleString("pt-BR",{timeZone:"America/Sao_Paulo"});
 const alCat=r=>r.catalogo?(CATN[r.catalogo]||r.catalogo):"—";
 function alFiltrar(){
   const q=$("#alq").value.trim().toLowerCase(),c=$("#alc2").value;
-  return alRows.filter(r=>(!q||r.email.toLowerCase().includes(q))&&(!c||r.catalogo===c))}
+  return alRows.filter(r=>(!q||r.email.toLowerCase().includes(q))&&(c==="acao"?!!r.acao:(!c||r.catalogo===c)))}
 function alRender(){
   const rows=alFiltrar();
   let h;
   if(alResumo){
     const m=new Map();
-    rows.forEach(r=>{const k=r.email+"|"+(r.catalogo||"");const o=m.get(k)||{email:r.email,cat:alCat(r),n:0,ult:r.criado_em};o.n++;if(r.criado_em>o.ult)o.ult=r.criado_em;m.set(k,o)});
+    rows.filter(r=>!r.acao).forEach(r=>{const k=r.email+"|"+(r.catalogo||"");const o=m.get(k)||{email:r.email,cat:alCat(r),n:0,ult:r.criado_em};o.n++;if(r.criado_em>o.ult)o.ult=r.criado_em;m.set(k,o)});
     const l=[...m.values()].sort((a,b)=>b.ult.localeCompare(a.ult));
     h=`<table class="lg2"><thead><tr><th>E-mail</th><th>Catálogo</th><th>Último acesso</th><th>Acessos</th></tr></thead><tbody>${l.map(o=>`<tr><td>${esc(o.email)}</td><td>${esc(o.cat)}</td><td>${esc(fdh(o.ult))}</td><td>${o.n}</td></tr>`).join("")}</tbody></table>`;
     $("#alc").textContent=`${l.length} linha(s) no resumo`;
   }else{
-    h=`<table class="lg2"><thead><tr><th>Data e horário</th><th>E-mail</th><th>Catálogo acessado</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(fdh(r.criado_em))}</td><td>${esc(r.email)}</td><td>${esc(alCat(r))}</td></tr>`).join("")}</tbody></table>`;
+    h=`<table class="lg2"><thead><tr><th>Data e horário</th><th>E-mail</th><th>Catálogo</th><th>Ação</th></tr></thead><tbody>${rows.map(r=>`<tr${r.acao?' style="background:var(--nob)"':""}><td>${esc(fdh(r.criado_em))}</td><td>${esc(r.email)}</td><td>${esc(alCat(r))}</td><td>${r.acao?`<b>${esc(ACAON[r.acao]||r.acao)}</b>${r.detalhe?"<br><span class=\"sub\">"+esc(r.detalhe)+"</span>":""}`:"Acesso"}</td></tr>`).join("")}</tbody></table>`;
     $("#alc").textContent=`${rows.length} registro(s)`;
   }
   $("#alb").innerHTML=rows.length?h:'<div class="empty">Nenhum registro encontrado.</div>';
@@ -366,22 +388,35 @@ function alRender(){
 $("#logbtn").onclick=async()=>{
   if(!admin)return;
   $("#alq").value="";$("#alc2").value="";alResumo=false;$("#alb").innerHTML='<div class="empty">Carregando…</div>';$("#alc").textContent="";$("#alog").classList.add("on");
-  const {data,error}=await sb.from("acessos").select("email,criado_em,catalogo").order("criado_em",{ascending:false}).limit(2000);
-  if(error){$("#alb").innerHTML=`<div class="empty">Não foi possível carregar o log: ${esc(error.message)}</div>`;return}
-  alRows=data||[];alRender();
+  try{alRows=await alCarregar()}catch(error){$("#alb").innerHTML=`<div class="empty">Não foi possível carregar o log: ${esc(error.message||error)}</div>`;return}
+  alRender();
 };
 $("#alq").oninput=alRender;$("#alc2").onchange=alRender;
 $("#alv").onclick=()=>{alResumo=!alResumo;alRender()};
 $("#alf").onclick=()=>$("#alog").classList.remove("on");
-$("#alx").onclick=()=>{
-  const rows=alFiltrar();
-  const csv="\uFEFFdata_hora;email;catalogo\n"+rows.map(r=>`${fdh(r.criado_em)};${r.email};${alCat(r)}`).join("\n");
-  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
-  a.download=`log-acessos-${new Date().toISOString().slice(0,10)}.csv`;document.body.appendChild(a);a.click();a.remove();
+$("#alx").onclick=()=>baixarCsv(alFiltrar(),`log-acessos-${new Date().toISOString().slice(0,10)}.csv`);
+let alBk=false;
+$("#alclr").onclick=()=>{
+  if(!admin)return;alBk=false;
+  $("#alc3m").innerHTML=`Isto apaga <b>todos os ${alRows.length} registro(s)</b> do log de acessos, inclusive o registro de quem apagou itens do catálogo.<br><br><b>Faça o backup antes:</b> clique em "Baixar backup (CSV)" e guarde o arquivo. O botão de limpar só é liberado depois do download.<br><br>Esta ação não pode ser desfeita.`;
+  $("#alc3k").disabled=true;$("#alc3k").style.opacity=".5";$("#alc3").classList.add("on");
+};
+$("#alc3x").onclick=()=>$("#alc3").classList.remove("on");
+$("#alc3b").onclick=async()=>{
+  try{const todos=await alCarregar();alRows=todos;baixarCsv(todos,`backup-log-acessos-${new Date().toISOString().slice(0,10)}.csv`);alBk=true;$("#alc3k").disabled=false;$("#alc3k").style.opacity="1";toast(`Backup baixado com ${todos.length} registro(s). Confira o arquivo antes de limpar.`,9000)}
+  catch(e){toast("Não foi possível gerar o backup: "+(e.message||e),9000)}
+};
+$("#alc3k").onclick=async()=>{
+  if(!admin||!alBk)return;const n=alRows.length;$("#alc3").classList.remove("on");
+  const {error}=await sb.from("acessos").delete().not("id","is",null);
+  if(error){toast("Não foi possível limpar o log: "+(error.message||error),12000);return}
+  const e2=await registrarAcao("limpar_log",`Histórico limpo (${n} registro(s) removidos; backup baixado)`,cur);
+  try{alRows=await alCarregar()}catch(e){alRows=[]}
+  alRender();toast("Histórico do log limpo.",8000);
 };
 function setPreview(v){
   if(!realAdmin)return;preview=v;admin=realAdmin&&!preview;
-  document.querySelectorAll("#ovl,#dl,#iv,#lst,#alog,#sd,#cf").forEach(e=>e.classList.remove("on"));
+  document.querySelectorAll("#ovl,#dl,#iv,#lst,#alog,#alc3,#sd,#cf").forEach(e=>e.classList.remove("on"));
   render();window.scrollTo(0,0);
 }
 $("#pvbtn").onclick=()=>setPreview(true);

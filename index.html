@@ -68,6 +68,18 @@ header #up{background:var(--acc);border-color:var(--acc);color:#1b1f24;font-weig
 .st.clk{cursor:pointer;text-align:left;font:inherit;color:var(--tx);width:100%}.st.clk:hover{border-color:var(--pri)}.st.clk b{font-size:26px}.st.g b{color:var(--ok)}.st.r b{color:var(--no)}
 .lr{display:flex;gap:12px;padding:9px 2px;border-bottom:1px solid var(--bd)}.lr .cod{min-width:70px}.lr .dt{color:var(--mut);font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}
 .ph{display:none}
+#plog{display:none}
+@media print{
+  body.plog>*:not(#plog){display:none!important}
+  body.plog>#plog{display:block!important;padding:0;color:#000;background:#fff;font-size:11px}
+  #plog .pl{display:flex;gap:10px;align-items:center;margin-bottom:6px}
+  #plog h2{margin:0;font-size:16px}
+  #plog .meta{border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:8px;line-height:1.4}
+  #plog table{width:100%;border-collapse:collapse;font-size:11px}
+  #plog th,#plog td{border-bottom:1px solid #999;padding:4px 6px;text-align:left;vertical-align:top;color:#000!important;background:none!important}
+  #plog thead{display:table-header-group}#plog tr{break-inside:avoid;page-break-inside:avoid}
+  #plog .sub{color:#000!important;font-size:11px}
+}
 @page{size:A4 landscape;margin:10mm;}
 @media print{
   html,body{width:297mm!important;min-width:0!important;max-width:none!important;margin:0!important;padding:0!important;background:#fff!important;overflow:visible!important}
@@ -151,10 +163,11 @@ header #home,header #logbtn,header #pvbtn{background:transparent;color:#fff;bord
   <b>Log de acessos</b>
   <div style="display:flex;gap:8px;flex-wrap:wrap"><input id="alq" type="search" placeholder="Filtrar por e-mail…" style="flex:1;min-width:160px"><select id="alc2" style="background:var(--card);color:var(--tx);border:1px solid var(--bd);border-radius:8px;padding:7px 8px;font:inherit"><option value="">Todos os catálogos</option><option value="consumo">Catálogo de Itens de Consumo</option><option value="permanentes">Catálogo de Bens Permanentes</option><option value="inicio">Tela inicial</option><option value="acao">Somente ações (apagar / limpar)</option></select><button id="alv">Ver resumo por e-mail</button></div>
   <div id="alb" style="overflow:auto"></div>
-  <div class="row"><span id="alc" class="sub" style="margin-right:auto"></span><button id="alx">Baixar CSV</button><button id="alclr" style="color:var(--no)">Limpar histórico</button><button id="alf" class="pri">Fechar</button></div></div></div>
+  <div class="row"><span id="alc" class="sub" style="margin-right:auto"></span><button id="alx">Baixar CSV</button><button id="alp">🖨 Imprimir log</button><button id="alclr" style="color:var(--no)">Limpar histórico</button><button id="alf" class="pri">Fechar</button></div></div></div>
 <div class="ovl" id="alc3"><div class="mod"><b style="color:var(--no)">Limpar histórico do log</b>
   <div id="alc3m"></div>
   <div class="row"><button id="alc3x">Cancelar</button><button id="alc3b" class="pri">1) Baixar backup (CSV)</button><button id="alc3k" disabled style="background:var(--no);border-color:var(--no);color:#fff;opacity:.5">2) Limpar histórico</button></div></div></div>
+<div id="plog"></div>
 <div class="ovl" id="lst"><div class="mod" style="max-width:760px;max-height:85vh;grid-template-rows:auto 1fr auto"><b id="lt"></b><div class="ph" id="ph"></div><div id="lb" style="overflow:auto"></div><div class="row"><button id="lp" class="pri">🖨 Imprimir / salvar relatório</button><button id="lc">Fechar</button></div></div></div>
 <div class="ovl" id="da"><div class="mod"><b style="color:var(--no)">Apagar todos os itens</b>
   <div id="dam"></div>
@@ -393,6 +406,16 @@ $("#logbtn").onclick=async()=>{
 };
 $("#alq").oninput=alRender;$("#alc2").onchange=alRender;
 $("#alv").onclick=()=>{alResumo=!alResumo;alRender()};
+$("#alp").onclick=()=>{
+  if(!admin)return;
+  const n=alFiltrar().length;if(!n)return toast("Não há registros para imprimir.");
+  const q=$("#alq").value.trim(),c=$("#alc2"),ct=c.value?c.options[c.selectedIndex].text:"Todos os catálogos";
+  const logo=document.querySelector("#app header img").src;
+  $("#plog").innerHTML=`<div class="meta"><div class="pl"><img src="${logo}" style="height:42px;background:#fff"><h2>Log de acessos — ${esc(SYSTEMS.consumo?"Catálogos FUMEC":"")}</h2></div>Emitido em ${esc(fdh(new Date()))} por ${esc(userEmail||"")}<br>Visualização: ${alResumo?"resumo por e-mail":"todos os registros"} · Catálogo: ${esc(ct)}${q?" · Filtro de e-mail: "+esc(q):""}<br>${$("#alc").textContent}</div>`+$("#alb").innerHTML;
+  const fim=()=>{document.body.classList.remove("plog");window.removeEventListener("afterprint",fim)};
+  window.addEventListener("afterprint",fim);document.body.classList.add("plog");
+  window.print();
+};
 $("#alf").onclick=()=>$("#alog").classList.remove("on");
 $("#alx").onclick=()=>baixarCsv(alFiltrar(),`log-acessos-${new Date().toISOString().slice(0,10)}.csv`);
 let alBk=false;

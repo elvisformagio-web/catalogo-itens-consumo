@@ -69,6 +69,10 @@ header #up{background:var(--acc);border-color:var(--acc);color:#1b1f24;font-weig
 .lr{display:flex;gap:12px;padding:9px 2px;border-bottom:1px solid var(--bd)}.lr .cod{min-width:70px}.lr .dt{color:var(--mut);font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}
 .ph{display:none}
 #plog{display:none}
+.loc{margin-top:8px;padding:8px 10px;border-radius:8px;background:var(--okb);color:var(--tx);font-size:14px;display:flex;gap:14px;flex-wrap:wrap}
+.loc b{font-size:16px}.loc small{display:block;font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px}
+.loc.sem{background:var(--bg);border:1px dashed var(--bd);color:var(--mut)}
+#ruaf{background:var(--card);color:var(--tx);border:1px solid var(--bd);border-radius:8px;padding:7px 8px;font:inherit}
 @media print{
   body.plog>*:not(#plog){display:none!important}
   body.plog>#plog{display:block!important;padding:0;color:#000;background:#fff;font-size:11px}
@@ -107,6 +111,7 @@ header #up{background:var(--acc);border-color:var(--acc);color:#1b1f24;font-weig
 .tile:hover{filter:brightness(1.12)}
 .tile .ic{width:46px;height:46px;border:1px solid #fff;border-radius:50%;display:grid;place-items:center}
 .tile svg{width:24px;height:24px;stroke:#fff;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.t3{background:linear-gradient(#f39200 40%,#a85f00)}
 .t1{background:linear-gradient(#26c900 40%,#0f6100)}.t2{background:linear-gradient(#0050f0 40%,#00308f)}
 #pvbar{display:none;position:sticky;top:0;z-index:40;background:#f39200;color:#1b1f24;padding:8px 14px;text-align:center;font-size:14px;font-weight:600}#pvbar button{margin-left:10px;background:#fff;color:#1b1f24;border-color:#fff;padding:3px 10px}
 header #delall{background:#fff;color:var(--no);border-color:#fff;font-weight:600}
@@ -140,6 +145,7 @@ header #home,header #logbtn,header #pvbtn{background:transparent;color:#fff;bord
 <div class="tg" style="margin-top:16px">
   <a class="tile t1" href="#/consumo" data-go="consumo"><span class="ic"><svg viewBox="0 0 24 24"><path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/></svg></span>Catálogo de Itens de Consumo</a>
   <a class="tile t2" href="#/permanentes" data-go="permanentes"><span class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M8 20h8M12 16v4"/></svg></span>Catálogo de Bens Permanentes</a>
+  <a class="tile t3" href="#/enderecamento" data-go="enderecamento"><span class="ic"><svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V3M19 21V3M5 8h14M5 14h14"/><rect x="7" y="4.5" width="4" height="3"/><rect x="13" y="10.5" width="4" height="3"/><rect x="8" y="16.5" width="4" height="3.5"/></svg></span>Endereçamento de Itens</a>
 </div></div></div>
 <div id="app" style="display:none"><div class="wrap">
 <header>
@@ -151,8 +157,9 @@ header #home,header #logbtn,header #pvbtn{background:transparent;color:#fff;bord
 <div class="hint">Imagens: use o nome do arquivo igual ao código do item (ex.: <b>1234.jpg</b>). Um único arquivo alimenta os dois almoxarifados: <b>NOME_ALMOX</b> define o estoque (Central ou Ceprocamp), <b>COD_REDUZIDO</b> o código, <b>DESCR_PRODUTO</b> o nome e <b>QT_ATUAL</b> a quantidade (somada se o código repetir no mesmo estoque). Só o que mudou é sobrescrito; imagem e status ativo/inativo são preservados.</div>
 <div class="avi" role="note"><span aria-hidden="true">ℹ️</span><span><b>Atenção:</b> as imagens exibidas neste catálogo são apenas <b>ilustrativas</b> e podem diferir do item real.</span></div>
 <div class="bar">
+  <select id="ruaf" style="display:none"></select>
   <input type="search" id="q" placeholder="Buscar por nome, código ou descrição…">
-  <span class="tabs"><button data-f="todos" class="on">Todos</button> <button data-f="disp">Disponíveis</button> <button data-f="indisp">Indisponíveis</button> <button data-f="novo" class="est" style="display:none">Novos</button> <button data-f="usado" class="est" style="display:none">Usados</button> <button data-f="desat">Desativados</button></span>
+  <span class="tabs"><button data-f="todos" class="on">Todos</button> <button data-f="disp">Disponíveis</button> <button data-f="indisp">Indisponíveis</button> <button data-f="novo" class="est" style="display:none">Novos</button> <button data-f="usado" class="est" style="display:none">Usados</button> <button data-f="cend" class="end" style="display:none">Com endereço</button> <button data-f="send" class="end" style="display:none">Sem endereço</button> <button data-f="desat">Desativados</button></span>
 </div>
 <div id="list"></div>
 </div></div>
@@ -161,7 +168,7 @@ header #home,header #logbtn,header #pvbtn{background:transparent;color:#fff;bord
   <input type="password" id="pi" autocomplete="current-password"><div class="row"><button id="pc">Cancelar</button><button class="pri" id="po">Entrar</button></div></div></div>
 <div class="ovl" id="alog"><div class="mod" style="max-width:760px;max-height:85vh;grid-template-rows:auto auto 1fr auto">
   <b>Log de acessos</b>
-  <div style="display:flex;gap:8px;flex-wrap:wrap"><input id="alq" type="search" placeholder="Filtrar por e-mail…" style="flex:1;min-width:160px"><select id="alc2" style="background:var(--card);color:var(--tx);border:1px solid var(--bd);border-radius:8px;padding:7px 8px;font:inherit"><option value="">Todos os catálogos</option><option value="consumo">Catálogo de Itens de Consumo</option><option value="permanentes">Catálogo de Bens Permanentes</option><option value="inicio">Tela inicial</option><option value="acao">Somente ações (apagar / limpar)</option></select><button id="alv">Ver resumo por e-mail</button></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap"><input id="alq" type="search" placeholder="Filtrar por e-mail…" style="flex:1;min-width:160px"><select id="alc2" style="background:var(--card);color:var(--tx);border:1px solid var(--bd);border-radius:8px;padding:7px 8px;font:inherit"><option value="">Todos os catálogos</option><option value="consumo">Catálogo de Itens de Consumo</option><option value="permanentes">Catálogo de Bens Permanentes</option><option value="enderecamento">Endereçamento de Itens</option><option value="inicio">Tela inicial</option><option value="acao">Somente ações (apagar / limpar)</option></select><button id="alv">Ver resumo por e-mail</button></div>
   <div id="alb" style="overflow:auto"></div>
   <div class="row"><span id="alc" class="sub" style="margin-right:auto"></span><button id="alx">Baixar CSV</button><button id="alp">🖨 Imprimir log</button><button id="alclr" style="color:var(--no)">Limpar histórico</button><button id="alf" class="pri">Fechar</button></div></div></div>
 <div class="ovl" id="alc3"><div class="mod"><b style="color:var(--no)">Limpar histórico do log</b>
@@ -177,6 +184,13 @@ header #home,header #logbtn,header #pvbtn{background:transparent;color:#fff;bord
   <div class="row"><button id="dc">Cancelar</button><button id="dok" style="background:var(--no);border-color:var(--no);color:#fff">Excluir</button></div></div></div>
 <div class="ovl" id="iv"><div class="mod"><b>Marcar como indisponível</b><div>Deixar <b id="ivn"></b> indisponível? A quantidade será alterada para <b>0</b> (hoje: <b id="ivq"></b>).</div>
   <div class="row"><button id="ivc">Cancelar</button><button id="ivok" class="pri">Confirmar</button></div></div></div>
+<div class="ovl" id="ae"><div class="mod">
+  <b id="aet">Definir endereço</b><div id="aen" class="sub"></div>
+  <div><label>Rua</label><input id="aer" placeholder="Ex.: Rua 3" autocomplete="off"></div>
+  <div><label>Endereço (posição no porta-palete)</label><input id="aee" placeholder="Ex.: A-12-2 (módulo, nível, posição)" autocomplete="off"></div>
+  <div class="sub">Deixe os dois campos em branco para remover o endereço.</div>
+  <div class="row"><button id="aec">Cancelar</button><button class="pri" id="aes">Salvar</button></div>
+</div></div>
 <div class="ovl" id="ovl"><div class="mod">
   <b id="mt">Editar</b>
   <div id="fn"><label>Nome</label><input id="mn"></div>
@@ -201,7 +215,9 @@ const SYSTEMS={
   consumo:{titulo:"Catálogo de Itens de Consumo",est:[["central","Almoxarifado Central"],["ceprocamp","Almoxarifado Ceprocamp"]],hint:document.querySelector(".hint").innerHTML},
   permanentes:{titulo:"Catálogo de Bens Permanentes",est:[["bens","Bens Permanentes"]],semCodigo:true,
     hint:'Planilha com várias colunas; só são usadas <b>DESCR_BEM</b> e <b>NOME_UNIDADE</b>. Cada linha vale 1 unidade: a quantidade é o número de linhas do mesmo bem (tudo a partir de <b>N/S</b> na descrição é ignorado). <b>NOVOS</b> ou <b>USADOS</b> em NOME_UNIDADE separa o estado do bem e aparece no canto da foto. Não há código: a descrição + estado identificam o bem. Imagens: o nome do arquivo deve ser igual à descrição do bem (ignora acentos, maiúsculas e pontuação).'}};
-let SYS=SYSTEMS.consumo,cur=null;
+SYSTEMS.enderecamento={titulo:"Endereçamento de Itens",est:SYSTEMS.consumo.est,end:true,
+  hint:'Usa a mesma planilha e os mesmos itens do Catálogo de Itens de Consumo (a importação feita aqui ou lá atualiza os dois). Em cada item, clique em <b>Definir endereço</b> e informe a <b>rua</b> e o <b>endereço</b> (posição no porta-palete). O endereço é separado por almoxarifado e não é alterado pela importação.'};
+let SYS=SYSTEMS.consumo,cur=null,ruaSel="";
 const ESTK=()=>SYS.est.map(e=>e[0]);
 const NOMES=new Proxy({},{get:(_,k)=>(SYS.est.find(e=>e[0]===k)||[0,String(k)])[1]});
 $("#plogo").src=document.querySelector("#app header img").src;
@@ -209,9 +225,10 @@ function applySys(){
   $("#app h1").textContent=SYS.titulo;
   $("#stk").style.display=SYS.est.length>1?"":"none";
   document.querySelectorAll("#stk button").forEach(b=>b.classList.toggle("on",b.dataset.s===est));
-  filt="todos";term="";$("#q").value="";
+  filt="todos";term="";ruaSel="";$("#q").value="";
   document.querySelectorAll(".tabs button").forEach(x=>x.classList.toggle("on",x.dataset.f==="todos"));
   document.querySelectorAll(".tabs .est").forEach(e=>e.style.display=SYS.semCodigo?"":"none");
+  $("#q").placeholder=SYS.end?"Buscar por nome, código, rua ou endereço…":"Buscar por nome, código ou descrição…";
   document.querySelector(".hint").innerHTML=SYS.hint;
 }
 function apply(){
@@ -295,7 +312,7 @@ async function init(){
   if(ok){try{const rt=sessionStorage.getItem("rt");if(rt){sessionStorage.removeItem("rt");if(!location.hash||location.hash==="#/")location.hash=rt}}catch(e){}fromHash();await start()}
 }
 function render(){
-  applyMode();const imp=imps[est],cur=juntarBens(items.filter(i=>i.estoque===est&&(admin?true:disp(i)))),tot=cur.length,dp=cur.filter(disp).length;
+  applyMode();if(SYS.end)return renderEnd();const imp=imps[est],cur=juntarBens(items.filter(i=>i.estoque===est&&(admin?true:disp(i)))),tot=cur.length,dp=cur.filter(disp).length;
   const st=(v,l,c="",k="")=>admin&&k&&Number(v)>0?`<button class="st ${c} clk" data-l="${k}"><b>${v}</b><span>${l} ›</span></button>`:`<div class="st ${c}"><b>${v}</b><span>${l}</span></div>`;
   $("#stats").innerHTML=st(tot,admin&&SYS.est.length>1?"Itens neste almoxarifado":"Itens no catálogo")+st(dp,"Disponíveis","g")+(admin?st(tot-dp,"Indisponíveis","r")+st(imp?imp.novos:"–","Novos na última importação","g","n")+st(imp?items.filter(i=>i.estoque===est&&mesmaImp(i,imp)&&entrada(i)).length:"–","Entradas: novos, reabastecidos ou com aumento","g","e")+st(imp?imp.zerados:"–","Zeraram na última importação","r","z")+st(imp?items.filter(i=>i.estoque===est&&mesmaImp(i,imp)&&saidaSemZerar(i)).length:"–","Saídas sem zerar o saldo","","s")+st(imp?(Number(imp.alterados)||0)+(Number(imp.novos)||0):"–","Itens alterados (inclui novos)","","a"):"");
   $("#last").textContent=!imp?"Nenhuma importação realizada ainda":admin?`Última importação: ${new Date(imp.data).toLocaleString("pt-BR")} · ${imp.arquivo||""} · ${imp.total} linhas`:`Atualizado em ${new Date(imp.data).toLocaleString("pt-BR")}`;
@@ -303,8 +320,30 @@ function render(){
   if(!l.length){$("#list").innerHTML=`<div class="empty">${cur.length?"Nenhum item encontrado.":"Catálogo vazio. Importe a planilha para começar."}</div>`;return}
   $("#list").innerHTML='<div class="grid">'+l.map(i=>{const d=disp(i),off=i.ativo===false;return `<div class="card ${off?"off":""}"><div class="img"><img loading="lazy" src="${esc(i.imagem||ph(i.nome))}" alt="" onerror="this.src='${ph(i.nome)}'"><span class="tag ${d?"ok":"no"}">${d?"Disponível":"Indisponível"}</span>${off&&admin?'<span class="tag dz">Desativado</span>':""}${SYS.semCodigo&&admin&&estBem(i.codigo)?`<span class="tag es ${estBem(i.codigo)==="NOVOS"?"nv":"us"}">${estBem(i.codigo)==="NOVOS"?"Novo":"Usado"}</span>`:""}</div><div class="body">${SYS.semCodigo?"":`<div class="cod">Cód. ${esc(i.codigo)}</div>`}<div class="nm">${esc(i.nome)}</div><div class="ds">${esc(i.descricao)||"Sem descrição"}</div>${admin?`<div class="qt">Quantidade: <b>${Number(i.quantidade)||0}</b></div>`:""}</div>${admin?`<div class="act" data-id="${esc(i._id)}"><button data-a="tog">${off?"Ativar":"Desativar"}</button><button data-a="qtd">Indisponível</button><button data-a="img">Alterar imagem</button><button data-a="edit">Editar</button><button data-a="del" class="dng">Excluir item</button></div>`:""}</div>`}).join("")+"</div>";
 }
+function renderEnd(){
+  const imp=imps[est],base=items.filter(i=>i.estoque===est&&i.ativo!==false),tem=i=>!!(String(i.rua||"").trim()||String(i.endereco||"").trim());
+  const nCom=base.filter(tem).length;
+  $("#stats").innerHTML=`<div class="st"><b>${base.length}</b><span>Itens neste almoxarifado</span></div><div class="st g"><b>${nCom}</b><span>Com endereço</span></div><div class="st r"><b>${base.length-nCom}</b><span>Sem endereço</span></div>`;
+  $("#last").textContent=!imp?"Nenhuma importação realizada ainda":`Planilha de ${new Date(imp.data).toLocaleString("pt-BR")}`;
+  const ruas=[...new Set(base.map(i=>String(i.rua||"").trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"pt-BR",{numeric:true}));
+  if(ruaSel&&!ruas.includes(ruaSel))ruaSel="";
+  $("#ruaf").innerHTML='<option value="">Todas as ruas</option>'+ruas.map(r=>`<option value="${esc(r)}"${r===ruaSel?" selected":""}>${esc(r)}</option>`).join("");
+  const t=term.toLowerCase();
+  const l=base.filter(i=>{
+    if(t&&!`${i.nome} ${i.codigo} ${i.rua||""} ${i.endereco||""}`.toLowerCase().includes(t))return false;
+    if(ruaSel&&String(i.rua||"").trim()!==ruaSel)return false;
+    if(filt==="cend")return tem(i);if(filt==="send")return !tem(i);return true});
+  if(!l.length){$("#list").innerHTML=`<div class="empty">${base.length?"Nenhum item encontrado.":"Nenhum item. Importe a planilha para começar."}</div>`;return}
+  $("#list").innerHTML='<div class="grid">'+l.map(i=>`<div class="card"><div class="img"><img loading="lazy" src="${esc(i.imagem||ph(i.nome))}" alt="" onerror="this.src='${ph(i.nome)}'"></div><div class="body"><div class="cod">Cód. ${esc(i.codigo)}</div><div class="nm">${esc(i.nome)}</div>${tem(i)?`<div class="loc"><div><small>Rua</small><b>${esc(i.rua||"—")}</b></div><div><small>Endereço</small><b>${esc(i.endereco||"—")}</b></div></div>`:'<div class="loc sem">Sem endereço cadastrado</div>'}</div>${admin?`<div class="act" data-id="${esc(i._id)}"><button data-a="end" style="grid-column:1/-1">${tem(i)?"Alterar endereço":"Definir endereço"}</button></div>`:""}</div>`).join("")+"</div>";
+}
+$("#ruaf").onchange=()=>{ruaSel=$("#ruaf").value;render()};
+let endId=null;
+function openEnd(it){endId=it._id;$("#aen").textContent=`${it.codigo} — ${it.nome} · ${NOMES[it.estoque]}`;$("#aer").value=it.rua||"";$("#aee").value=it.endereco||"";$("#ae").classList.add("on");$("#aer").focus()}
+$("#aec").onclick=()=>$("#ae").classList.remove("on");
+$("#aes").onclick=async()=>{if(!admin||!endId)return;const r=$("#aer").value.trim().replace(/\s+/g," "),e=$("#aee").value.trim().replace(/\s+/g," ");$("#ae").classList.remove("on");await upd(endId,{rua:r||null,endereco:e||null},r||e?"Endereço salvo.":"Endereço removido.");endId=null};
+$("#aee").onkeydown=$("#aer").onkeydown=e=>{if(e.key==="Enter")$("#aes").click()};
 async function upd(id,data,msg){try{const {error}=await sb.from("itens").update(data).eq("id",id);if(error)throw error;if(msg)toast(msg);await loadData()}catch(e){toast("Não foi possível salvar: "+(e.message||e.code))}}
-$("#list").addEventListener("click",e=>{const b=e.target.closest("button[data-a]");if(!b)return;const id=b.parentElement.dataset.id,it=items.find(x=>x._id===id);if(!it)return;const a=b.dataset.a;if(a==="tog")upd(id,{ativo:it.ativo===false},it.ativo===false?"Item ativado":"Item desativado");else if(a==="qtd"){if(!(Number(it.quantidade)>0))toast("Este item já está indisponível (quantidade 0).");else{ivId=id;$("#ivn").textContent=`${SYS.semCodigo?"":it.codigo+" — "}${it.nome}`;$("#ivq").textContent=Number(it.quantidade)||0;$("#iv").classList.add("on")}}else if(a==="img"){imgId=id;$("#imgin").click()}else if(a==="del"){delId=id;$("#dn").textContent=`${it.codigo} — ${it.nome}`;$("#dl").classList.add("on")}else openMod(it,a)});
+$("#list").addEventListener("click",e=>{const b=e.target.closest("button[data-a]");if(!b)return;const id=b.parentElement.dataset.id,it=items.find(x=>x._id===id);if(!it)return;const a=b.dataset.a;if(a==="end")openEnd(it);else if(a==="tog")upd(id,{ativo:it.ativo===false},it.ativo===false?"Item ativado":"Item desativado");else if(a==="qtd"){if(!(Number(it.quantidade)>0))toast("Este item já está indisponível (quantidade 0).");else{ivId=id;$("#ivn").textContent=`${SYS.semCodigo?"":it.codigo+" — "}${it.nome}`;$("#ivq").textContent=Number(it.quantidade)||0;$("#iv").classList.add("on")}}else if(a==="img"){imgId=id;$("#imgin").click()}else if(a==="del"){delId=id;$("#dn").textContent=`${it.codigo} — ${it.nome}`;$("#dl").classList.add("on")}else openMod(it,a)});
 $("#imgin").onchange=async e=>{const f=e.target.files[0];e.target.value="";if(!f||!imgId)return;try{toast("Enviando imagem…");const path=`${imgId}/${Date.now()}-${f.name.replace(/[^A-Za-z0-9._-]/g,"_")}`;const {error}=await sb.storage.from("imagens").upload(path,f,{upsert:true});if(error)throw error;const {data}=sb.storage.from("imagens").getPublicUrl(path);await upd(imgId,{imagem:data.publicUrl},"Imagem atualizada")}catch(x){toast("Falha no upload: "+(x.message||x.code))}};
 function openMod(it,mode){editId=it._id;editMode=mode;$("#mt").textContent=mode==="qtd"?"Alterar quantidade — "+it.nome:"Editar item";$("#fn").style.display=$("#fd").style.display=mode==="qtd"?"none":"block";$("#mn").value=it.nome||"";$("#md").value=it.descricao||"";$("#mq").value=Number(it.quantidade)||0;$("#ovl").classList.add("on");$("#mq").focus()}
 $("#ivc").onclick=()=>$("#iv").classList.remove("on");
@@ -349,7 +388,7 @@ $("#stats").addEventListener("click",e=>{const b=e.target.closest("[data-l]");if
 $("#lp").onclick=()=>{if(!relat||!relat.l.length)return toast("Não há itens para imprimir.");window.print()};
 $("#lc").onclick=()=>$("#lst").classList.remove("on");
 /* ---------- Log de acessos ---------- */
-const CATN={consumo:"Catálogo de Itens de Consumo",permanentes:"Catálogo de Bens Permanentes",inicio:"Tela inicial"};
+const CATN={consumo:"Catálogo de Itens de Consumo",permanentes:"Catálogo de Bens Permanentes",enderecamento:"Endereçamento de Itens",inicio:"Tela inicial"};
 function registrarAcesso(email,cat){
   cat=CATN[cat]&&cat!=="inicio"?cat:"inicio";
   try{
@@ -439,7 +478,7 @@ $("#alc3k").onclick=async()=>{
 };
 function setPreview(v){
   if(!realAdmin)return;preview=v;admin=realAdmin&&!preview;
-  document.querySelectorAll("#ovl,#dl,#iv,#lst,#alog,#alc3,#sd,#cf").forEach(e=>e.classList.remove("on"));
+  document.querySelectorAll("#ae,#ovl,#dl,#iv,#lst,#alog,#alc3,#sd,#cf").forEach(e=>e.classList.remove("on"));
   render();window.scrollTo(0,0);
 }
 $("#pvbtn").onclick=()=>setPreview(true);
@@ -450,6 +489,16 @@ function applyMode(){
   );
   document.querySelectorAll(".tabs .est").forEach(e=>e.style.display=SYS.semCodigo&&admin?"":"none");
   if(!admin&&(filt==="novo"||filt==="usado")){filt="todos";document.querySelectorAll(".tabs button").forEach(x=>x.classList.toggle("on",x.dataset.f==="todos"))}
+  {const E=!!SYS.end;
+   document.querySelectorAll(".tabs button").forEach(b=>{const f=b.dataset.f;
+     if(E)b.style.display=(f==="todos"||b.classList.contains("end"))?"":"none";
+     else if(b.classList.contains("end"))b.style.display="none";
+     else if(f==="novo"||f==="usado")b.style.display=SYS.semCodigo&&admin?"":"none";
+     else if(f==="desat"||f==="indisp")b.style.display=admin?"":"none";
+     else b.style.display=""});
+   if(E){["#upimg","#delall"].forEach(q=>document.querySelectorAll(q).forEach(e=>e.style.display="none"));}
+   if((E&&!["todos","cend","send"].includes(filt))||(!E&&(filt==="cend"||filt==="send"))){filt="todos";document.querySelectorAll(".tabs button").forEach(x=>x.classList.toggle("on",x.dataset.f==="todos"))}
+   $("#ruaf").style.display=E?"":"none";}
   $("#logbtn").style.display=admin?"":"none";
   $("#pvbtn").style.display=admin?"":"none";
   $("#pvbar").style.display=realAdmin&&preview?"block":"none";

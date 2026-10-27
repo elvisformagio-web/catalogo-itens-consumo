@@ -72,7 +72,7 @@ header #up{background:var(--acc);border-color:var(--acc);color:#1b1f24;font-weig
 .loc{margin-top:8px;padding:8px 10px;border-radius:8px;background:var(--okb);color:var(--tx);font-size:14px;display:flex;gap:14px;flex-wrap:wrap}
 .loc b{font-size:16px}.loc small{display:block;font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px}
 .aer{display:grid;grid-template-columns:1fr 1.4fr auto;gap:6px;align-items:center}.aer input{min-width:0}.loc+.loc{margin-top:4px}
-.loc{align-items:center}.alm{margin-left:auto;font-size:11px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;padding:3px 9px;border-radius:99px;color:#fff;background:#0B4A9A}.alm.ceprocamp{background:#B35F00}
+.loc{align-items:center}.alm{margin-left:auto;font-size:11px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;padding:3px 9px;border-radius:99px;color:#fff;background:#0B4A9A}.alm.ceprocamp,.alm.us{background:#B35F00}
 .loc.sem{background:var(--bg);border:1px dashed var(--bd);color:var(--mut)}
 #ruaf{background:var(--card);color:var(--tx);border:1px solid var(--bd);border-radius:8px;padding:7px 8px;font:inherit}
 @media print{
@@ -113,6 +113,7 @@ header #up{background:var(--acc);border-color:var(--acc);color:#1b1f24;font-weig
 .tile:hover{filter:brightness(1.12)}
 .tile .ic{width:46px;height:46px;border:1px solid #fff;border-radius:50%;display:grid;place-items:center}
 .tile svg{width:24px;height:24px;stroke:#fff;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.t4{background:linear-gradient(#8e44c9 40%,#4b1d7a)}
 .t3{background:linear-gradient(#f39200 40%,#a85f00)}
 .t1{background:linear-gradient(#26c900 40%,#0f6100)}.t2{background:linear-gradient(#0050f0 40%,#00308f)}
 #pvbar{display:none;position:sticky;top:0;z-index:40;background:#f39200;color:#1b1f24;padding:8px 14px;text-align:center;font-size:14px;font-weight:600}#pvbar button{margin-left:10px;background:#fff;color:#1b1f24;border-color:#fff;padding:3px 10px}
@@ -147,7 +148,8 @@ header #home,header #logbtn,header #pvbtn{background:transparent;color:#fff;bord
 <div class="tg" style="margin-top:16px">
   <a class="tile t1" href="#/consumo" data-go="consumo"><span class="ic"><svg viewBox="0 0 24 24"><path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/></svg></span>Catálogo de Itens de Consumo</a>
   <a class="tile t2" href="#/permanentes" data-go="permanentes"><span class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M8 20h8M12 16v4"/></svg></span>Catálogo de Bens Permanentes</a>
-  <a class="tile t3" href="#/enderecamento" data-go="enderecamento"><span class="ic"><svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V3M19 21V3M5 8h14M5 14h14"/><rect x="7" y="4.5" width="4" height="3"/><rect x="13" y="10.5" width="4" height="3"/><rect x="8" y="16.5" width="4" height="3.5"/></svg></span>Endereçamento de Itens</a>
+  <a class="tile t3" href="#/enderecamento" data-go="enderecamento"><span class="ic"><svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V3M19 21V3M5 8h14M5 14h14"/><rect x="7" y="4.5" width="4" height="3"/><rect x="13" y="10.5" width="4" height="3"/><rect x="8" y="16.5" width="4" height="3.5"/></svg></span>Endereçamento de Itens de Consumo</a>
+  <a class="tile t4" href="#/enderecamento_bens" data-go="enderecamento_bens"><span class="ic"><svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V3M19 21V3M5 8h14M5 14h14"/><rect x="7" y="4" width="4" height="3.5"/><rect x="13" y="9.5" width="4" height="3.5"/><rect x="7.5" y="16" width="5" height="4"/></svg></span>Endereçamento de Bens Permanentes</a>
 </div></div></div>
 <div id="app" style="display:none"><div class="wrap">
 <header>
@@ -170,7 +172,7 @@ header #home,header #logbtn,header #pvbtn{background:transparent;color:#fff;bord
   <input type="password" id="pi" autocomplete="current-password"><div class="row"><button id="pc">Cancelar</button><button class="pri" id="po">Entrar</button></div></div></div>
 <div class="ovl" id="alog"><div class="mod" style="max-width:760px;max-height:85vh;grid-template-rows:auto auto 1fr auto">
   <b>Log de acessos</b>
-  <div style="display:flex;gap:8px;flex-wrap:wrap"><input id="alq" type="search" placeholder="Filtrar por e-mail…" style="flex:1;min-width:160px"><select id="alc2" style="background:var(--card);color:var(--tx);border:1px solid var(--bd);border-radius:8px;padding:7px 8px;font:inherit"><option value="">Todos os catálogos</option><option value="consumo">Catálogo de Itens de Consumo</option><option value="permanentes">Catálogo de Bens Permanentes</option><option value="enderecamento">Endereçamento de Itens</option><option value="inicio">Tela inicial</option><option value="acao">Somente ações (apagar / limpar)</option></select><button id="alv">Ver resumo por e-mail</button></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap"><input id="alq" type="search" placeholder="Filtrar por e-mail…" style="flex:1;min-width:160px"><select id="alc2" style="background:var(--card);color:var(--tx);border:1px solid var(--bd);border-radius:8px;padding:7px 8px;font:inherit"><option value="">Todos os catálogos</option><option value="consumo">Catálogo de Itens de Consumo</option><option value="permanentes">Catálogo de Bens Permanentes</option><option value="enderecamento">Endereçamento de Itens de Consumo</option><option value="enderecamento_bens">Endereçamento de Bens Permanentes</option><option value="inicio">Tela inicial</option><option value="acao">Somente ações (apagar / limpar)</option></select><button id="alv">Ver resumo por e-mail</button></div>
   <div id="alb" style="overflow:auto"></div>
   <div class="row"><span id="alc" class="sub" style="margin-right:auto"></span><button id="alx">Baixar CSV</button><button id="alp">🖨 Imprimir log</button><button id="alclr" style="color:var(--no)">Limpar histórico</button><button id="alf" class="pri">Fechar</button></div></div></div>
 <div class="ovl" id="alc3"><div class="mod"><b style="color:var(--no)">Limpar histórico do log</b>
@@ -217,8 +219,10 @@ const SYSTEMS={
   consumo:{titulo:"Catálogo de Itens de Consumo",est:[["central","Almoxarifado Central"],["ceprocamp","Almoxarifado Ceprocamp"]],hint:document.querySelector(".hint").innerHTML},
   permanentes:{titulo:"Catálogo de Bens Permanentes",est:[["bens","Bens Permanentes"]],semCodigo:true,
     hint:'Planilha com várias colunas; só são usadas <b>DESCR_BEM</b> e <b>NOME_UNIDADE</b>. Cada linha vale 1 unidade: a quantidade é o número de linhas do mesmo bem (tudo a partir de <b>N/S</b> na descrição é ignorado). <b>NOVOS</b> ou <b>USADOS</b> em NOME_UNIDADE separa o estado do bem e aparece no canto da foto. Não há código: a descrição + estado identificam o bem. Imagens: o nome do arquivo deve ser igual à descrição do bem (ignora acentos, maiúsculas e pontuação).'}};
-SYSTEMS.enderecamento={titulo:"Endereçamento de Itens",est:SYSTEMS.consumo.est,end:true,
+SYSTEMS.enderecamento={titulo:"Endereçamento de Itens de Consumo",est:SYSTEMS.consumo.est,end:true,
   hint:'Usa a mesma planilha e os mesmos itens do Catálogo de Itens de Consumo (a importação feita aqui ou lá atualiza os dois). Cada item pode ter vários endereços (cargas maiores): clique em <b>Definir/Alterar endereços</b>. Para cadastrar em massa, use <b>Importar endereços</b> (colunas <b>COD_REDUZIDO</b>, <b>RUA</b> e <b>ENDERECO</b>; uma linha por endereço ou vários endereços na mesma célula separados por <b>-</b> ou <b>,</b> (a rua é repetida para cada um), e <b>NOME_ALMOX</b> é opcional). <b>Padrão:</b> rua = número + letra (ex.: <b>3A</b>); endereço = letra + número (ex.: <b>B12</b>). Os endereços não são alterados pela importação diária.'};
+SYSTEMS.enderecamento_bens={titulo:"Endereçamento de Bens Permanentes",est:SYSTEMS.permanentes.est,end:true,semCodigo:true,
+  hint:'Usa os mesmos bens do Catálogo de Bens Permanentes (a importação feita aqui ou lá atualiza os dois). Como não há código, o bem é identificado pela <b>descrição</b> e pelo estado (<b>novo</b> ou <b>usado</b>): cada estado tem seus próprios endereços. Um bem pode ter vários endereços: clique em <b>Definir/Alterar endereços</b>. Para cadastrar em massa, use <b>Importar endereços</b> (colunas <b>DESCR_BEM</b>, <b>NOME_UNIDADE</b> com NOVOS/USADOS, <b>RUA</b> e <b>ENDERECO</b>; tudo a partir de N/S na descrição é ignorado; vários endereços na mesma célula separados por <b>-</b> ou <b>,</b>). <b>Padrão:</b> rua = número + letra (ex.: <b>3A</b>); endereço = letra + número (ex.: <b>B12</b>).'};
 let SYS=SYSTEMS.consumo,cur=null,ruaSel="";
 const ESTK=()=>SYS.est.map(e=>e[0]);
 const NOMES=new Proxy({},{get:(_,k)=>(SYS.est.find(e=>e[0]===k)||[0,String(k)])[1]});
@@ -347,14 +351,14 @@ function renderEnd(){
     if(ruaSel&&!E.some(e=>String(e.rua||"").trim()===ruaSel))return false;
     if(filt==="cend")return E.length>0;if(filt==="send")return E.length===0;return true});
   if(!l.length){$("#list").innerHTML=`<div class="empty">${base.length?"Nenhum item encontrado.":"Nenhum item. Importe a planilha para começar."}</div>`;return}
-  $("#list").innerHTML='<div class="grid">'+l.map(i=>{const E=endsDe(i);return `<div class="card"><div class="img"><img loading="lazy" src="${esc(i.imagem||ph(i.nome))}" alt="" onerror="this.src='${ph(i.nome)}'"></div><div class="body"><div class="cod">Cód. ${esc(i.codigo)}</div><div class="nm">${esc(i.nome)}</div>${E.length?E.map(e=>`<div class="loc"><div><small>Rua</small><b>${esc(e.rua||"—")}</b></div><div><small>Endereço</small><b>${esc(e.endereco||"—")}</b></div><span class="alm ${i.estoque}">${i.estoque==="central"?"Central":"Ceprocamp"}</span></div>`).join(""):'<div class="loc sem">Sem endereço cadastrado</div>'}</div>${admin?`<div class="act" data-id="${esc(i._id)}"><button data-a="end" style="grid-column:1/-1">${E.length?"Alterar endereços":"Definir endereço"}</button></div>`:""}</div>`}).join("")+"</div>";
+  $("#list").innerHTML='<div class="grid">'+l.map(i=>{const E=endsDe(i);return `<div class="card"><div class="img"><img loading="lazy" src="${esc(i.imagem||ph(i.nome))}" alt="" onerror="this.src='${ph(i.nome)}'"></div><div class="body">${SYS.semCodigo?"":`<div class="cod">Cód. ${esc(i.codigo)}</div>`}<div class="nm">${esc(i.nome)}</div>${E.length?E.map(e=>`<div class="loc"><div><small>Rua</small><b>${esc(e.rua||"—")}</b></div><div><small>Endereço</small><b>${esc(e.endereco||"—")}</b></div>${SYS.semCodigo?(estBem(i.codigo)?`<span class="alm ${estBem(i.codigo)==="NOVOS"?"nv":"us"}">${estBem(i.codigo)==="NOVOS"?"Novo":"Usado"}</span>`:""):`<span class="alm ${i.estoque}">${i.estoque==="central"?"Central":"Ceprocamp"}</span>`}</div>`).join(""):'<div class="loc sem">Sem endereço cadastrado</div>'}</div>${admin?`<div class="act" data-id="${esc(i._id)}"><button data-a="end" style="grid-column:1/-1">${E.length?"Alterar endereços":"Definir endereço"}</button></div>`:""}</div>`}).join("")+"</div>";
 }
 $("#ruaf").onchange=()=>{ruaSel=$("#ruaf").value;render()};
 let endItem=null;
 const aeLinha=(r="",e="",id="")=>`<div class="aer" data-id="${esc(id)}"><input class="r" placeholder="Rua (ex.: 3A)" maxlength="6" style="text-transform:uppercase" value="${esc(r)}" autocomplete="off"><input class="e" placeholder="Endereço (ex.: B12)" maxlength="6" style="text-transform:uppercase" value="${esc(e)}" autocomplete="off"><button class="x" title="Remover" type="button">✕</button></div>`;
 function openEnd(it){
   if(endErr)return toast("A tabela de endereços ainda não existe. Rode a seção 10 do SQL no Supabase.",9000);
-  endItem=it;$("#aen").textContent=`${it.codigo} — ${it.nome} · ${NOMES[it.estoque]}`;
+  endItem=it;$("#aen").textContent=SYS.semCodigo?`${it.nome}${estBem(it.codigo)?" ("+(estBem(it.codigo)==="NOVOS"?"novo":"usado")+")":""}`:`${it.codigo} — ${it.nome} · ${NOMES[it.estoque]}`;
   const E=endsDe(it);$("#aelist").innerHTML=(E.length?E:[{}]).map(e=>aeLinha(e.rua||"",e.endereco||"",e.id||"")).join("");
   $("#ae").classList.add("on");const f=$("#aelist input");if(f)f.focus();
 }
@@ -407,7 +411,7 @@ async function lerPlanilha(file){
 }
 $("#upend").onclick=()=>{if(admin)$("#endin").click()};
 $("#modend").onclick=()=>{
-  const csv="﻿COD_REDUZIDO;RUA;ENDERECO\n158849;3A;B12\n158849;4C;A7-A8\n160001;3A;C2, C3\n";
+  const csv=SYS.semCodigo?"\uFEFFDESCR_BEM;NOME_UNIDADE;RUA;ENDERECO\nCADEIRA GIRATORIA PRETA;BENS NOVOS;3A;B12\nCADEIRA GIRATORIA PRETA;BENS USADOS;4C;A7-A8\nMESA REUNIAO 2M;BENS NOVOS;3A;C2, C3\n":"\uFEFFCOD_REDUZIDO;RUA;ENDERECO\n158849;3A;B12\n158849;4C;A7-A8\n160001;3A;C2, C3\n";
   const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));a.download="modelo-enderecos.csv";document.body.appendChild(a);a.click();a.remove();
 };
 $("#endin").onchange=async e=>{
@@ -417,21 +421,29 @@ $("#endin").onchange=async e=>{
     toast("Lendo planilha de endereços…",60000);
     const rows=await lerPlanilha(f);if(rows.length<2)return toast("Planilha vazia ou sem linhas de dados.",9000);
     const h=rows.shift().map(norm),col=al=>h.findIndex(x=>al.includes(x));
-    const iC=col(["codreduzido","codigo","cod","sku"]),iR=col(["rua","corredor"]),iE=col(["endereco","posicao","localizacao","vaga","enderecofisico"]),iA=col(["nomealmox","almoxarifado","estoque"]);
-    if(iC<0||(iR<0&&iE<0)){toast("A planilha precisa ter as colunas COD_REDUZIDO e RUA e/ou ENDERECO. Use o botão \"Modelo de endereços\".",12000);return}
-    const porEst={central:new Map(),ceprocamp:new Map()},semEst=[],invalidas=[];let lidas=0;
+    const BEM=!!SYS.semCodigo;
+    const iC=BEM?col(["descrbem","descricao","bem","descrproduto","nome","item"]):col(["codreduzido","codigo","cod","sku"]),iR=col(["rua","corredor"]),iE=col(["endereco","posicao","localizacao","vaga","enderecofisico"]),iA=col(["nomealmox","almoxarifado","estoque"]),iU=col(["nomeunidade","estado"]);
+    if(iC<0||(iR<0&&iE<0)){toast(BEM?"A planilha precisa ter as colunas DESCR_BEM e RUA e/ou ENDERECO (e NOME_UNIDADE com NOVOS/USADOS). Use o botão \"Modelo de endereços\".":"A planilha precisa ter as colunas COD_REDUZIDO e RUA e/ou ENDERECO. Use o botão \"Modelo de endereços\".",12000);return}
+    const porEst=Object.fromEntries(ESTK().map(k=>[k,new Map()])),semEst=[],invalidas=[];let lidas=0;
+    const porDesc=new Map();if(BEM)items.filter(i=>i.estoque===est).forEach(i=>{const k=norm(cdesc(i.codigo));if(!porDesc.has(k))porDesc.set(k,[]);porDesc.get(k).push(String(i.codigo).trim())});
     for(const r of rows){
-      const cod=fx(r[iC]).trim();if(!cod)continue;
-      const k=iA>=0?stockOf(r[iA]):est;if(!k||!porEst[k]){semEst.push(cod);continue}
+      let cods;
+      if(BEM){
+        let d=limpaTxt(fx(r[iC]));const m=d.search(/\bN\s*\/\s*S\b/i);if(m>=0)d=d.slice(0,m).replace(/[\s\-–:;,.]+$/,"").trim();if(!d)continue;
+        const u=iU>=0?norm(r[iU]):"",es=u.includes("usad")?"USADOS":u.includes("novo")?"NOVOS":"";
+        const achados=(porDesc.get(norm(d))||[]).filter(c=>!es||estBem(c)===es);
+        cods=achados.length?achados:[d+"|"+es];
+      }else{const c=fx(r[iC]).trim();if(!c)continue;cods=[c]}
+      const k=BEM||SYS.est.length===1?ESTK()[0]:(iA>=0?stockOf(r[iA]):est);if(!k||!porEst[k]){semEst.push(cods[0]);continue}
       const ruaT=limpaTxt(fx(iR>=0?r[iR]:"")),enT=limpaTxt(fx(iE>=0?r[iE]:""));if(!ruaT&&!enT)continue;
       const rua=normRua(ruaT),ens=splitEnd(enT);
-      if(!rua||!ens){invalidas.push(`${cod}: "${ruaT}" / "${enT}"`);continue}
+      if(!rua||!ens){invalidas.push(`${cods[0].split("|")[0]}: "${ruaT}" / "${enT}"`);continue}
       // vários endereços na mesma célula: repete a rua para cada endereço
-      for(const en of ens){lidas++;const m=porEst[k];if(!m.has(cod))m.set(cod,new Map());m.get(cod).set((rua+"|"+en).toLowerCase(),{rua,endereco:en})}
+      for(const cod of cods)for(const en of ens){lidas++;const m=porEst[k];if(!m.has(cod))m.set(cod,new Map());m.get(cod).set((rua+"|"+en).toLowerCase(),{rua,endereco:en})}
     }
     const conhecidos=new Set(items.map(i=>i.estoque+"|"+String(i.codigo).trim())),sem=[];let nItens=0,nEnd=0;const grava=[];
     for(const k of Object.keys(porEst))for(const [cod,mm] of porEst[k]){
-      if(!conhecidos.has(k+"|"+cod)){sem.push(cod);continue}
+      if(!conhecidos.has(k+"|"+cod)){sem.push(cod.split("|")[0]);continue}
       nItens++;for(const v of mm.values()){nEnd++;grava.push({estoque:k,codigo:cod,rua:v.rua,endereco:v.endereco})}
     }
     if(!nItens){toast(invalidas.length?`Nenhuma linha válida: ${invalidas.length} com formato inválido (ex.: ${invalidas.slice(0,3).join(" | ")}). Rua = número + letra (3A); Endereço = letra + número (B12).`:`Nenhum código da planilha foi encontrado no catálogo (${sem.length} sem cadastro). Importe antes a planilha do dia.`,14000);return}
@@ -494,7 +506,7 @@ $("#stats").addEventListener("click",e=>{const b=e.target.closest("[data-l]");if
 $("#lp").onclick=()=>{if(!relat||!relat.l.length)return toast("Não há itens para imprimir.");window.print()};
 $("#lc").onclick=()=>$("#lst").classList.remove("on");
 /* ---------- Log de acessos ---------- */
-const CATN={consumo:"Catálogo de Itens de Consumo",permanentes:"Catálogo de Bens Permanentes",enderecamento:"Endereçamento de Itens",inicio:"Tela inicial"};
+const CATN={consumo:"Catálogo de Itens de Consumo",permanentes:"Catálogo de Bens Permanentes",enderecamento:"Endereçamento de Itens de Consumo",enderecamento_bens:"Endereçamento de Bens Permanentes",inicio:"Tela inicial"};
 function registrarAcesso(email,cat){
   cat=CATN[cat]&&cat!=="inicio"?cat:"inicio";
   try{

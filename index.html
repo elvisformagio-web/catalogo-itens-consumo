@@ -72,6 +72,7 @@ header #up{background:var(--acc);border-color:var(--acc);color:#1b1f24;font-weig
 .loc{margin-top:8px;padding:8px 10px;border-radius:8px;background:var(--okb);color:var(--tx);font-size:14px;display:flex;gap:14px;flex-wrap:wrap}
 .loc b{font-size:16px}.loc small{display:block;font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px}
 .aer{display:grid;grid-template-columns:1fr 1.4fr auto;gap:6px;align-items:center}.aer input{min-width:0}.loc+.loc{margin-top:4px}
+.loc{align-items:center}.alm{margin-left:auto;font-size:11px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;padding:3px 9px;border-radius:99px;color:#fff;background:#0B4A9A}.alm.ceprocamp{background:#B35F00}
 .loc.sem{background:var(--bg);border:1px dashed var(--bd);color:var(--mut)}
 #ruaf{background:var(--card);color:var(--tx);border:1px solid var(--bd);border-radius:8px;padding:7px 8px;font:inherit}
 @media print{
@@ -346,7 +347,7 @@ function renderEnd(){
     if(ruaSel&&!E.some(e=>String(e.rua||"").trim()===ruaSel))return false;
     if(filt==="cend")return E.length>0;if(filt==="send")return E.length===0;return true});
   if(!l.length){$("#list").innerHTML=`<div class="empty">${base.length?"Nenhum item encontrado.":"Nenhum item. Importe a planilha para começar."}</div>`;return}
-  $("#list").innerHTML='<div class="grid">'+l.map(i=>{const E=endsDe(i);return `<div class="card"><div class="img"><img loading="lazy" src="${esc(i.imagem||ph(i.nome))}" alt="" onerror="this.src='${ph(i.nome)}'"></div><div class="body"><div class="cod">Cód. ${esc(i.codigo)}</div><div class="nm">${esc(i.nome)}</div>${E.length?E.map(e=>`<div class="loc"><div><small>Rua</small><b>${esc(e.rua||"—")}</b></div><div><small>Endereço</small><b>${esc(e.endereco||"—")}</b></div></div>`).join(""):'<div class="loc sem">Sem endereço cadastrado</div>'}</div>${admin?`<div class="act" data-id="${esc(i._id)}"><button data-a="end" style="grid-column:1/-1">${E.length?"Alterar endereços":"Definir endereço"}</button></div>`:""}</div>`}).join("")+"</div>";
+  $("#list").innerHTML='<div class="grid">'+l.map(i=>{const E=endsDe(i);return `<div class="card"><div class="img"><img loading="lazy" src="${esc(i.imagem||ph(i.nome))}" alt="" onerror="this.src='${ph(i.nome)}'"></div><div class="body"><div class="cod">Cód. ${esc(i.codigo)}</div><div class="nm">${esc(i.nome)}</div>${E.length?E.map(e=>`<div class="loc"><div><small>Rua</small><b>${esc(e.rua||"—")}</b></div><div><small>Endereço</small><b>${esc(e.endereco||"—")}</b></div><span class="alm ${i.estoque}">${i.estoque==="central"?"Central":"Ceprocamp"}</span></div>`).join(""):'<div class="loc sem">Sem endereço cadastrado</div>'}</div>${admin?`<div class="act" data-id="${esc(i._id)}"><button data-a="end" style="grid-column:1/-1">${E.length?"Alterar endereços":"Definir endereço"}</button></div>`:""}</div>`}).join("")+"</div>";
 }
 $("#ruaf").onchange=()=>{ruaSel=$("#ruaf").value;render()};
 let endItem=null;

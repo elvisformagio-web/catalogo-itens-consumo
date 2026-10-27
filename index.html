@@ -189,7 +189,7 @@ header #home,header #logbtn,header #pvbtn{background:transparent;color:#fff;bord
   <b id="aet">Endereços do item</b><div id="aen" class="sub"></div>
   <div id="aelist" style="display:grid;gap:8px;max-height:50vh;overflow:auto"></div>
   <div><button id="aeadd">+ Adicionar outro endereço</button></div>
-  <div class="sub">Use mais de uma linha quando o item estiver em mais de um endereço (cargas maiores). Linhas em branco são ignoradas; sem nenhuma linha preenchida, o item fica sem endereço.</div>
+  <div class="sub">Padrão: <b>Rua</b> = número + letra (ex.: 3A) e <b>Endereço</b> = letra + número (ex.: B12). Use mais de uma linha quando o item estiver em mais de um endereço (cargas maiores). Linhas em branco são ignoradas; sem nenhuma linha preenchida, o item fica sem endereço.</div>
   <div class="row"><button id="aec">Cancelar</button><button class="pri" id="aes">Salvar</button></div>
 </div></div>
 <div class="ovl" id="ovl"><div class="mod">
@@ -217,7 +217,7 @@ const SYSTEMS={
   permanentes:{titulo:"Catálogo de Bens Permanentes",est:[["bens","Bens Permanentes"]],semCodigo:true,
     hint:'Planilha com várias colunas; só são usadas <b>DESCR_BEM</b> e <b>NOME_UNIDADE</b>. Cada linha vale 1 unidade: a quantidade é o número de linhas do mesmo bem (tudo a partir de <b>N/S</b> na descrição é ignorado). <b>NOVOS</b> ou <b>USADOS</b> em NOME_UNIDADE separa o estado do bem e aparece no canto da foto. Não há código: a descrição + estado identificam o bem. Imagens: o nome do arquivo deve ser igual à descrição do bem (ignora acentos, maiúsculas e pontuação).'}};
 SYSTEMS.enderecamento={titulo:"Endereçamento de Itens",est:SYSTEMS.consumo.est,end:true,
-  hint:'Usa a mesma planilha e os mesmos itens do Catálogo de Itens de Consumo (a importação feita aqui ou lá atualiza os dois). Cada item pode ter vários endereços (cargas maiores): clique em <b>Definir/Alterar endereços</b>. Para cadastrar em massa, use <b>Importar endereços</b> (colunas <b>COD_REDUZIDO</b>, <b>RUA</b> e <b>ENDERECO</b>; uma linha por endereço, e <b>NOME_ALMOX</b> é opcional). Os endereços não são alterados pela importação diária.'};
+  hint:'Usa a mesma planilha e os mesmos itens do Catálogo de Itens de Consumo (a importação feita aqui ou lá atualiza os dois). Cada item pode ter vários endereços (cargas maiores): clique em <b>Definir/Alterar endereços</b>. Para cadastrar em massa, use <b>Importar endereços</b> (colunas <b>COD_REDUZIDO</b>, <b>RUA</b> e <b>ENDERECO</b>; uma linha por endereço, e <b>NOME_ALMOX</b> é opcional). <b>Padrão:</b> rua = número + letra (ex.: <b>3A</b>); endereço = letra + número (ex.: <b>B12</b>). Os endereços não são alterados pela importação diária.'};
 let SYS=SYSTEMS.consumo,cur=null,ruaSel="";
 const ESTK=()=>SYS.est.map(e=>e[0]);
 const NOMES=new Proxy({},{get:(_,k)=>(SYS.est.find(e=>e[0]===k)||[0,String(k)])[1]});
@@ -350,7 +350,7 @@ function renderEnd(){
 }
 $("#ruaf").onchange=()=>{ruaSel=$("#ruaf").value;render()};
 let endItem=null;
-const aeLinha=(r="",e="",id="")=>`<div class="aer" data-id="${esc(id)}"><input class="r" placeholder="Rua (ex.: Rua 3)" value="${esc(r)}" autocomplete="off"><input class="e" placeholder="Endereço (ex.: A-12-2)" value="${esc(e)}" autocomplete="off"><button class="x" title="Remover" type="button">✕</button></div>`;
+const aeLinha=(r="",e="",id="")=>`<div class="aer" data-id="${esc(id)}"><input class="r" placeholder="Rua (ex.: 3A)" maxlength="6" style="text-transform:uppercase" value="${esc(r)}" autocomplete="off"><input class="e" placeholder="Endereço (ex.: B12)" maxlength="6" style="text-transform:uppercase" value="${esc(e)}" autocomplete="off"><button class="x" title="Remover" type="button">✕</button></div>`;
 function openEnd(it){
   if(endErr)return toast("A tabela de endereços ainda não existe. Rode a seção 10 do SQL no Supabase.",9000);
   endItem=it;$("#aen").textContent=`${it.codigo} — ${it.nome} · ${NOMES[it.estoque]}`;
@@ -360,10 +360,16 @@ function openEnd(it){
 $("#aeadd").onclick=()=>{$("#aelist").insertAdjacentHTML("beforeend",aeLinha());$("#aelist").lastElementChild.querySelector("input").focus()};
 $("#aelist").addEventListener("click",e=>{const x=e.target.closest(".x");if(x)x.parentElement.remove()});
 $("#aec").onclick=()=>$("#ae").classList.remove("on");
+// Padrão: RUA = número + letra (ex.: 3A) · ENDEREÇO = letra + número (ex.: B12)
+const normRua=v=>{const t=String(v??"").toUpperCase().replace(/[\s\-_.\/]/g,""),m=/^(\d{1,3})([A-Z])$/.exec(t);return m?String(parseInt(m[1],10))+m[2]:null};
+const normEnd=v=>{const t=String(v??"").toUpperCase().replace(/[\s\-_.\/]/g,""),m=/^([A-Z])(\d{1,3})$/.exec(t);return m?m[1]+String(parseInt(m[2],10)):null};
 const limpaTxt=v=>String(v??"").replace(/\s+/g," ").trim();
 $("#aes").onclick=async()=>{
   if(!admin||!endItem)return;const it=endItem;
-  const linhas=[...$("#aelist").querySelectorAll(".aer")].map(d=>({id:d.dataset.id,rua:limpaTxt(d.querySelector(".r").value),endereco:limpaTxt(d.querySelector(".e").value)})).filter(l=>l.rua||l.endereco);
+  const bruto=[...$("#aelist").querySelectorAll(".aer")].map(d=>({id:d.dataset.id,r:limpaTxt(d.querySelector(".r").value),e:limpaTxt(d.querySelector(".e").value)})).filter(l=>l.r||l.e);
+  const ruim=bruto.find(l=>!normRua(l.r)||!normEnd(l.e));
+  if(ruim)return toast(`Endereço inválido ("${ruim.r||"vazio"}" / "${ruim.e||"vazio"}"). Rua = número + letra (ex.: 3A); Endereço = letra + número (ex.: B12). Preencha os dois campos.`,10000);
+  const linhas=bruto.map(l=>({id:l.id,rua:normRua(l.r),endereco:normEnd(l.e)}));
   const vistos=new Set(),uniq=linhas.filter(l=>{const k=(l.rua+"|"+l.endereco).toLowerCase();if(vistos.has(k))return false;vistos.add(k);return true});
   const atuais=endsDe(it),manter=new Set(uniq.filter(l=>l.id).map(l=>l.id));
   $("#ae").classList.remove("on");
@@ -396,7 +402,7 @@ async function lerPlanilha(file){
 }
 $("#upend").onclick=()=>{if(admin)$("#endin").click()};
 $("#modend").onclick=()=>{
-  const csv="﻿COD_REDUZIDO;RUA;ENDERECO\n158849;Rua 1;A-01-1\n158849;Rua 2;B-03-2\n160001;Rua 1;A-02-1\n";
+  const csv="﻿COD_REDUZIDO;RUA;ENDERECO\n158849;3A;B12\n158849;4C;A7\n160001;3A;C2\n";
   const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));a.download="modelo-enderecos.csv";document.body.appendChild(a);a.click();a.remove();
 };
 $("#endin").onchange=async e=>{
@@ -408,11 +414,13 @@ $("#endin").onchange=async e=>{
     const h=rows.shift().map(norm),col=al=>h.findIndex(x=>al.includes(x));
     const iC=col(["codreduzido","codigo","cod","sku"]),iR=col(["rua","corredor"]),iE=col(["endereco","posicao","localizacao","vaga","enderecofisico"]),iA=col(["nomealmox","almoxarifado","estoque"]);
     if(iC<0||(iR<0&&iE<0)){toast("A planilha precisa ter as colunas COD_REDUZIDO e RUA e/ou ENDERECO. Use o botão \"Modelo de endereços\".",12000);return}
-    const porEst={central:new Map(),ceprocamp:new Map()},semEst=[];let lidas=0;
+    const porEst={central:new Map(),ceprocamp:new Map()},semEst=[],invalidas=[];let lidas=0;
     for(const r of rows){
       const cod=fx(r[iC]).trim();if(!cod)continue;
       const k=iA>=0?stockOf(r[iA]):est;if(!k||!porEst[k]){semEst.push(cod);continue}
-      const rua=limpaTxt(fx(iR>=0?r[iR]:"")),en=limpaTxt(fx(iE>=0?r[iE]:""));if(!rua&&!en)continue;
+      const ruaT=limpaTxt(fx(iR>=0?r[iR]:"")),enT=limpaTxt(fx(iE>=0?r[iE]:""));if(!ruaT&&!enT)continue;
+      const rua=normRua(ruaT),en=normEnd(enT);
+      if(!rua||!en){invalidas.push(`${cod}: "${ruaT}" / "${enT}"`);continue}
       lidas++;const m=porEst[k];if(!m.has(cod))m.set(cod,new Map());m.get(cod).set((rua+"|"+en).toLowerCase(),{rua,endereco:en});
     }
     const conhecidos=new Set(items.map(i=>i.estoque+"|"+String(i.codigo).trim())),sem=[];let nItens=0,nEnd=0;const grava=[];
@@ -420,8 +428,8 @@ $("#endin").onchange=async e=>{
       if(!conhecidos.has(k+"|"+cod)){sem.push(cod);continue}
       nItens++;for(const v of mm.values()){nEnd++;grava.push({estoque:k,codigo:cod,rua:v.rua,endereco:v.endereco})}
     }
-    if(!nItens){toast(`Nenhum código da planilha foi encontrado no catálogo (${sem.length} sem cadastro). Importe antes a planilha do dia.`,12000);return}
-    const msg=`Importar endereços?\n\n• ${nItens} item(ns) com ${nEnd} endereço(s)\n• ${sem.length} código(s) sem cadastro no catálogo (serão ignorados)\n\nPara cada item que aparece na planilha, os endereços atuais serão SUBSTITUÍDOS pelos da planilha. Itens que não estão na planilha não são alterados.`;
+    if(!nItens){toast(invalidas.length?`Nenhuma linha válida: ${invalidas.length} com formato inválido (ex.: ${invalidas.slice(0,3).join(" | ")}). Rua = número + letra (3A); Endereço = letra + número (B12).`:`Nenhum código da planilha foi encontrado no catálogo (${sem.length} sem cadastro). Importe antes a planilha do dia.`,14000);return}
+    const msg=`Importar endereços?\n\n• ${nItens} item(ns) com ${nEnd} endereço(s)\n• ${sem.length} código(s) sem cadastro no catálogo (serão ignorados)\n• ${invalidas.length} linha(s) com formato inválido (serão ignoradas)${invalidas.length?": "+invalidas.slice(0,3).join(" | ")+(invalidas.length>3?"…":""):""}\n\nPara cada item que aparece na planilha, os endereços atuais serão SUBSTITUÍDOS pelos da planilha. Itens que não estão na planilha não são alterados.`;
     if(!confirm(msg)){toast("Importação cancelada.");return}
     toast("Gravando endereços…",60000);
     const porK={};grava.forEach(g=>{(porK[g.estoque]=porK[g.estoque]||new Set()).add(g.codigo)});
@@ -431,7 +439,7 @@ $("#endin").onchange=async e=>{
     }
     for(let i=0;i<grava.length;i+=500){const {error}=await sb.from("enderecos").insert(grava.slice(i,i+500));if(error)throw error}
     await loadData();render();
-    toast(`Endereços importados: ${nEnd} para ${nItens} item(ns).${sem.length?` ${sem.length} código(s) sem cadastro ignorado(s): ${sem.slice(0,5).join(", ")}${sem.length>5?"…":""}`:""}`,15000);
+    toast(`Endereços importados: ${nEnd} para ${nItens} item(ns).${sem.length?` ${sem.length} código(s) sem cadastro ignorado(s): ${sem.slice(0,5).join(", ")}${sem.length>5?"…":""}.`:""}${invalidas.length?` ${invalidas.length} linha(s) com formato inválido ignorada(s).`:""}`,18000);
   }catch(x){toast("Erro na importação de endereços: "+(x.message||x.code||x),15000)}
 };
 async function upd(id,data,msg){try{const {error}=await sb.from("itens").update(data).eq("id",id);if(error)throw error;if(msg)toast(msg);await loadData()}catch(e){toast("Não foi possível salvar: "+(e.message||e.code))}}

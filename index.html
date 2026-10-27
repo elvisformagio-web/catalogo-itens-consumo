@@ -217,7 +217,7 @@ const SYSTEMS={
   permanentes:{titulo:"Catálogo de Bens Permanentes",est:[["bens","Bens Permanentes"]],semCodigo:true,
     hint:'Planilha com várias colunas; só são usadas <b>DESCR_BEM</b> e <b>NOME_UNIDADE</b>. Cada linha vale 1 unidade: a quantidade é o número de linhas do mesmo bem (tudo a partir de <b>N/S</b> na descrição é ignorado). <b>NOVOS</b> ou <b>USADOS</b> em NOME_UNIDADE separa o estado do bem e aparece no canto da foto. Não há código: a descrição + estado identificam o bem. Imagens: o nome do arquivo deve ser igual à descrição do bem (ignora acentos, maiúsculas e pontuação).'}};
 SYSTEMS.enderecamento={titulo:"Endereçamento de Itens",est:SYSTEMS.consumo.est,end:true,
-  hint:'Usa a mesma planilha e os mesmos itens do Catálogo de Itens de Consumo (a importação feita aqui ou lá atualiza os dois). Cada item pode ter vários endereços (cargas maiores): clique em <b>Definir/Alterar endereços</b>. Para cadastrar em massa, use <b>Importar endereços</b> (colunas <b>COD_REDUZIDO</b>, <b>RUA</b> e <b>ENDERECO</b>; uma linha por endereço, e <b>NOME_ALMOX</b> é opcional). <b>Padrão:</b> rua = número + letra (ex.: <b>3A</b>); endereço = letra + número (ex.: <b>B12</b>). Os endereços não são alterados pela importação diária.'};
+  hint:'Usa a mesma planilha e os mesmos itens do Catálogo de Itens de Consumo (a importação feita aqui ou lá atualiza os dois). Cada item pode ter vários endereços (cargas maiores): clique em <b>Definir/Alterar endereços</b>. Para cadastrar em massa, use <b>Importar endereços</b> (colunas <b>COD_REDUZIDO</b>, <b>RUA</b> e <b>ENDERECO</b>; uma linha por endereço ou vários endereços na mesma célula separados por <b>-</b> ou <b>,</b> (a rua é repetida para cada um), e <b>NOME_ALMOX</b> é opcional). <b>Padrão:</b> rua = número + letra (ex.: <b>3A</b>); endereço = letra + número (ex.: <b>B12</b>). Os endereços não são alterados pela importação diária.'};
 let SYS=SYSTEMS.consumo,cur=null,ruaSel="";
 const ESTK=()=>SYS.est.map(e=>e[0]);
 const NOMES=new Proxy({},{get:(_,k)=>(SYS.est.find(e=>e[0]===k)||[0,String(k)])[1]});
@@ -363,6 +363,10 @@ $("#aec").onclick=()=>$("#ae").classList.remove("on");
 // Padrão: RUA = número + letra (ex.: 3A) · ENDEREÇO = letra + número (ex.: B12)
 const normRua=v=>{const t=String(v??"").toUpperCase().replace(/[\s\-_.\/]/g,""),m=/^(\d{1,3})([A-Z])$/.exec(t);return m?String(parseInt(m[1],10))+m[2]:null};
 const normEnd=v=>{const t=String(v??"").toUpperCase().replace(/[\s\-_.\/]/g,""),m=/^([A-Z])(\d{1,3})$/.exec(t);return m?m[1]+String(parseInt(m[2],10)):null};
+// Célula com um ou vários endereços separados por "-" ou ",": "B12-C3, A7" -> [B12,C3,A7]; "B-12" -> [B12]
+const splitEnd=v=>{const t=String(v??"").toUpperCase(),re=/([A-Z])\s*-?\s*(\d{1,3})/g,out=[];let m;
+  while((m=re.exec(t)))out.push(m[1]+String(parseInt(m[2],10)));
+  if(!out.length||t.replace(re,"").replace(/[\s,;\-]/g,"")!=="")return null;return [...new Set(out)]};
 const limpaTxt=v=>String(v??"").replace(/\s+/g," ").trim();
 $("#aes").onclick=async()=>{
   if(!admin||!endItem)return;const it=endItem;
@@ -402,7 +406,7 @@ async function lerPlanilha(file){
 }
 $("#upend").onclick=()=>{if(admin)$("#endin").click()};
 $("#modend").onclick=()=>{
-  const csv="﻿COD_REDUZIDO;RUA;ENDERECO\n158849;3A;B12\n158849;4C;A7\n160001;3A;C2\n";
+  const csv="﻿COD_REDUZIDO;RUA;ENDERECO\n158849;3A;B12\n158849;4C;A7-A8\n160001;3A;C2, C3\n";
   const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));a.download="modelo-enderecos.csv";document.body.appendChild(a);a.click();a.remove();
 };
 $("#endin").onchange=async e=>{
@@ -419,9 +423,10 @@ $("#endin").onchange=async e=>{
       const cod=fx(r[iC]).trim();if(!cod)continue;
       const k=iA>=0?stockOf(r[iA]):est;if(!k||!porEst[k]){semEst.push(cod);continue}
       const ruaT=limpaTxt(fx(iR>=0?r[iR]:"")),enT=limpaTxt(fx(iE>=0?r[iE]:""));if(!ruaT&&!enT)continue;
-      const rua=normRua(ruaT),en=normEnd(enT);
-      if(!rua||!en){invalidas.push(`${cod}: "${ruaT}" / "${enT}"`);continue}
-      lidas++;const m=porEst[k];if(!m.has(cod))m.set(cod,new Map());m.get(cod).set((rua+"|"+en).toLowerCase(),{rua,endereco:en});
+      const rua=normRua(ruaT),ens=splitEnd(enT);
+      if(!rua||!ens){invalidas.push(`${cod}: "${ruaT}" / "${enT}"`);continue}
+      // vários endereços na mesma célula: repete a rua para cada endereço
+      for(const en of ens){lidas++;const m=porEst[k];if(!m.has(cod))m.set(cod,new Map());m.get(cod).set((rua+"|"+en).toLowerCase(),{rua,endereco:en})}
     }
     const conhecidos=new Set(items.map(i=>i.estoque+"|"+String(i.codigo).trim())),sem=[];let nItens=0,nEnd=0;const grava=[];
     for(const k of Object.keys(porEst))for(const [cod,mm] of porEst[k]){

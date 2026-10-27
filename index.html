@@ -349,9 +349,9 @@ function renderEnd(){
     const E=endsDe(i);
     if(t&&!`${i.nome} ${i.codigo} ${E.map(e=>e.rua+" "+e.endereco).join(" ")}`.toLowerCase().includes(t))return false;
     if(ruaSel&&!E.some(e=>String(e.rua||"").trim()===ruaSel))return false;
-    if(filt==="cend")return E.length>0;if(filt==="send")return E.length===0;return true});
+    if(filt==="novo"&&estBem(i.codigo)!=="NOVOS")return false;if(filt==="usado"&&estBem(i.codigo)!=="USADOS")return false;if(filt==="cend")return E.length>0;if(filt==="send")return E.length===0;return true});
   if(!l.length){$("#list").innerHTML=`<div class="empty">${base.length?"Nenhum item encontrado.":"Nenhum item. Importe a planilha para começar."}</div>`;return}
-  $("#list").innerHTML='<div class="grid">'+l.map(i=>{const E=endsDe(i);return `<div class="card"><div class="img"><img loading="lazy" src="${esc(i.imagem||ph(i.nome))}" alt="" onerror="this.src='${ph(i.nome)}'"></div><div class="body">${SYS.semCodigo?"":`<div class="cod">Cód. ${esc(i.codigo)}</div>`}<div class="nm">${esc(i.nome)}</div>${E.length?E.map(e=>`<div class="loc"><div><small>Rua</small><b>${esc(e.rua||"—")}</b></div><div><small>Endereço</small><b>${esc(e.endereco||"—")}</b></div>${SYS.semCodigo?(estBem(i.codigo)?`<span class="alm ${estBem(i.codigo)==="NOVOS"?"nv":"us"}">${estBem(i.codigo)==="NOVOS"?"Novo":"Usado"}</span>`:""):`<span class="alm ${i.estoque}">${i.estoque==="central"?"Central":"Ceprocamp"}</span>`}</div>`).join(""):'<div class="loc sem">Sem endereço cadastrado</div>'}</div>${admin?`<div class="act" data-id="${esc(i._id)}"><button data-a="end" style="grid-column:1/-1">${E.length?"Alterar endereços":"Definir endereço"}</button></div>`:""}</div>`}).join("")+"</div>";
+  $("#list").innerHTML='<div class="grid">'+l.map(i=>{const E=endsDe(i);return `<div class="card"><div class="img"><img loading="lazy" src="${esc(i.imagem||ph(i.nome))}" alt="" onerror="this.src='${ph(i.nome)}'">${SYS.semCodigo&&estBem(i.codigo)?`<span class="tag es ${estBem(i.codigo)==="NOVOS"?"nv":"us"}">${estBem(i.codigo)==="NOVOS"?"Novo":"Usado"}</span>`:""}</div><div class="body">${SYS.semCodigo?"":`<div class="cod">Cód. ${esc(i.codigo)}</div>`}<div class="nm">${esc(i.nome)}</div>${E.length?E.map(e=>`<div class="loc"><div><small>Rua</small><b>${esc(e.rua||"—")}</b></div><div><small>Endereço</small><b>${esc(e.endereco||"—")}</b></div>${SYS.semCodigo?(estBem(i.codigo)?`<span class="alm ${estBem(i.codigo)==="NOVOS"?"nv":"us"}">${estBem(i.codigo)==="NOVOS"?"Novo":"Usado"}</span>`:""):`<span class="alm ${i.estoque}">${i.estoque==="central"?"Central":"Ceprocamp"}</span>`}</div>`).join(""):'<div class="loc sem">Sem endereço cadastrado</div>'}</div>${admin?`<div class="act" data-id="${esc(i._id)}"><button data-a="end" style="grid-column:1/-1">${E.length?"Alterar endereços":"Definir endereço"}</button></div>`:""}</div>`}).join("")+"</div>";
 }
 $("#ruaf").onchange=()=>{ruaSel=$("#ruaf").value;render()};
 let endItem=null;
@@ -609,14 +609,14 @@ function applyMode(){
   if(!admin&&(filt==="novo"||filt==="usado")){filt="todos";document.querySelectorAll(".tabs button").forEach(x=>x.classList.toggle("on",x.dataset.f==="todos"))}
   {const E=!!SYS.end;
    document.querySelectorAll(".tabs button").forEach(b=>{const f=b.dataset.f;
-     if(E)b.style.display=(f==="todos"||b.classList.contains("end"))?"":"none";
+     if(E)b.style.display=(f==="todos"||b.classList.contains("end")||((f==="novo"||f==="usado")&&SYS.semCodigo))?"":"none";
      else if(b.classList.contains("end"))b.style.display="none";
      else if(f==="novo"||f==="usado")b.style.display=SYS.semCodigo&&admin?"":"none";
      else if(f==="desat"||f==="indisp")b.style.display=admin?"":"none";
      else b.style.display=""});
    if(E){["#upimg","#delall"].forEach(q=>document.querySelectorAll(q).forEach(e=>e.style.display="none"));}
    ["#upend","#modend"].forEach(q=>$(q).style.display=E&&admin?"":"none");
-   if((E&&!["todos","cend","send"].includes(filt))||(!E&&(filt==="cend"||filt==="send"))){filt="todos";document.querySelectorAll(".tabs button").forEach(x=>x.classList.toggle("on",x.dataset.f==="todos"))}
+   if((E&&!["todos","cend","send",...(SYS.semCodigo?["novo","usado"]:[])].includes(filt))||(!E&&(filt==="cend"||filt==="send"))){filt="todos";document.querySelectorAll(".tabs button").forEach(x=>x.classList.toggle("on",x.dataset.f==="todos"))}
    $("#ruaf").style.display=E?"":"none";}
   $("#logbtn").style.display=admin?"":"none";
   $("#pvbtn").style.display=admin?"":"none";

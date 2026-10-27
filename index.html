@@ -332,9 +332,9 @@ function render(){
 }
 const endsDe=i=>endMap.get(i.estoque+"|"+String(i.codigo).trim())||[];
 function renderEnd(){
-  const imp=imps[est],base=items.filter(i=>i.estoque===est&&i.ativo!==false);
+  const imp=imps[est],base=items.filter(i=>i.estoque===est&&i.ativo!==false&&Number(i.quantidade)>0);
   const nCom=base.filter(i=>endsDe(i).length).length;
-  $("#stats").innerHTML=`<div class="st"><b>${base.length}</b><span>Itens neste almoxarifado</span></div><div class="st g"><b>${nCom}</b><span>Com endereço</span></div><div class="st r"><b>${base.length-nCom}</b><span>Sem endereço</span></div>`;
+  $("#stats").innerHTML=`<div class="st"><b>${base.length}</b><span>Itens com saldo neste almoxarifado</span></div><div class="st g"><b>${nCom}</b><span>Com endereço</span></div><div class="st r"><b>${base.length-nCom}</b><span>Sem endereço</span></div>`;
   $("#last").textContent=endErr?"Tabela de endereços não encontrada: rode a seção 10 do SQL no Supabase.":!imp?"Nenhuma importação realizada ainda":`Planilha de ${new Date(imp.data).toLocaleString("pt-BR")}`;
   const ruas=[...new Set(ends.filter(e=>e.estoque===est).map(e=>String(e.rua||"").trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"pt-BR",{numeric:true}));
   if(ruaSel&&!ruas.includes(ruaSel))ruaSel="";

@@ -636,6 +636,7 @@ $("#uaq").oninput=uaRender;
 $("#uaadd").onclick=async()=>{
   const e=$("#uan").value.trim().toLowerCase();
   if(!e.endsWith("@"+DOM)||e.length<DOM.length+2)return toast(`Informe um e-mail @${DOM}.`,7000);
+  if(e===SUPER)return toast("Esta conta é a do administrador principal e não pode ser alterada aqui.",7000);
   const {error}=await sb.from("usuarios").upsert({email:e},{onConflict:"email",ignoreDuplicates:true});
   if(error)return toast("Não foi possível adicionar: "+(error.message||error),9000);
   await uaCarregar();$("#uan").value="";$("#uaq").value=e;uaRender();toast("Usuário adicionado. Marque os sistemas liberados.");

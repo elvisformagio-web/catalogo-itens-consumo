@@ -231,7 +231,7 @@ function applySys(){
   $("#app h1").textContent=SYS.titulo;
   $("#stk").style.display=SYS.est.length>1?"":"none";
   document.querySelectorAll("#stk button").forEach(b=>b.classList.toggle("on",b.dataset.s===est));
-  filt="todos";term="";ruaSel="";$("#q").value="";
+  filt="todos";filtSet.clear();term="";ruaSel="";$("#q").value="";
   document.querySelectorAll(".tabs button").forEach(x=>x.classList.toggle("on",x.dataset.f==="todos"));
   document.querySelectorAll(".tabs .est").forEach(e=>e.style.display=SYS.semCodigo?"":"none");
   $("#q").placeholder=SYS.end?"Buscar por nome, código, rua ou endereço…":"Buscar por nome, código ou descrição…";
@@ -248,6 +248,7 @@ function go(k){cur=SYSTEMS[k]?k:null;try{location.hash=cur?"#/"+cur:"#/"}catch(e
 function fromHash(){const h=(location.hash||"").replace(/^#\/?/,"");cur=SYSTEMS[h]?h:null;apply()}
 window.addEventListener("hashchange",fromHash);
 document.addEventListener("click",e=>{const t=e.target.closest("[data-go]");if(t){e.preventDefault();go(t.dataset.go)}});
+const filtSet=new Set();
 let ends=[],endMap=new Map(),endErr=null,ivId=null,items=[],imps={},est="central",admin=false,realAdmin=false,preview=false,filt="todos",term="",editId=null,delId=null,editMode="",imgId=null,relat=null;
 function toast(m,ms=4500){const t=$("#toast");t.textContent=m;t.style.display="block";clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.display="none",ms)}
 const ph=n=>"data:image/svg+xml;utf8,"+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><rect width="400" height="300" fill="#c9ced6"/><text x="200" y="175" font-size="90" text-anchor="middle" fill="#8a919c" font-family="sans-serif">${esc((n||"?").trim()[0]||"?").toUpperCase()}</text></svg>`);
@@ -349,7 +350,11 @@ function renderEnd(){
     const E=endsDe(i);
     if(t&&!`${i.nome} ${i.codigo} ${E.map(e=>e.rua+" "+e.endereco).join(" ")}`.toLowerCase().includes(t))return false;
     if(ruaSel&&!E.some(e=>String(e.rua||"").trim()===ruaSel))return false;
-    if(filt==="novo"&&estBem(i.codigo)!=="NOVOS")return false;if(filt==="usado"&&estBem(i.codigo)!=="USADOS")return false;if(filt==="cend")return E.length>0;if(filt==="send")return E.length===0;return true});
+    const est1=[filtSet.has("novo")&&"NOVOS",filtSet.has("usado")&&"USADOS"].filter(Boolean);
+    if(est1.length&&!est1.includes(estBem(i.codigo)))return false;
+    const ce=filtSet.has("cend"),se=filtSet.has("send");
+    if((ce||se)&&!((ce&&E.length>0)||(se&&E.length===0)))return false;
+    return true});
   if(!l.length){$("#list").innerHTML=`<div class="empty">${base.length?"Nenhum item encontrado.":"Nenhum item. Importe a planilha para começar."}</div>`;return}
   $("#list").innerHTML='<div class="grid">'+l.map(i=>{const E=endsDe(i);return `<div class="card"><div class="img"><img loading="lazy" src="${esc(i.imagem||ph(i.nome))}" alt="" onerror="this.src='${ph(i.nome)}'">${SYS.semCodigo&&estBem(i.codigo)?`<span class="tag es ${estBem(i.codigo)==="NOVOS"?"nv":"us"}">${estBem(i.codigo)==="NOVOS"?"Novo":"Usado"}</span>`:""}</div><div class="body">${SYS.semCodigo?"":`<div class="cod">Cód. ${esc(i.codigo)}</div>`}<div class="nm">${esc(i.nome)}</div>${E.length?E.map(e=>`<div class="loc"><div><small>Rua</small><b>${esc(e.rua||"—")}</b></div><div><small>Endereço</small><b>${esc(e.endereco||"—")}</b></div>${SYS.semCodigo?(estBem(i.codigo)?`<span class="alm ${estBem(i.codigo)==="NOVOS"?"nv":"us"}">${estBem(i.codigo)==="NOVOS"?"Novo":"Usado"}</span>`:""):`<span class="alm ${i.estoque}">${i.estoque==="central"?"Central":"Ceprocamp"}</span>`}</div>`).join(""):'<div class="loc sem">Sem endereço cadastrado</div>'}</div>${admin?`<div class="act" data-id="${esc(i._id)}"><button data-a="end" style="grid-column:1/-1">${E.length?"Alterar endereços":"Definir endereço"}</button></div>`:""}</div>`}).join("")+"</div>";
 }
@@ -492,7 +497,14 @@ $("#dok").onclick=async()=>{$("#dl").classList.remove("on");try{const {error}=aw
 $("#mc").onclick=()=>$("#ovl").classList.remove("on");
 $("#ms").onclick=async()=>{const q=Math.max(0,parseFloat($("#mq").value)||0),d={quantidade:q};if(editMode==="edit"){d.nome=$("#mn").value.trim()||"Sem nome";d.descricao=$("#md").value.trim()}$("#ovl").classList.remove("on");await upd(editId,d,"Item atualizado")};
 $("#q").oninput=e=>{term=e.target.value;render()};
-document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>{filt=b.dataset.f;document.querySelectorAll(".tabs button").forEach(x=>x.classList.toggle("on",x===b));render()});
+document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>{
+  if(SYS.end){ // endereçamento: filtros combináveis (ex.: Novos + Com endereço)
+    const f=b.dataset.f;filt="todos";
+    if(f==="todos")filtSet.clear();else if(filtSet.has(f))filtSet.delete(f);else filtSet.add(f);
+    document.querySelectorAll(".tabs button").forEach(x=>x.classList.toggle("on",x.dataset.f==="todos"?filtSet.size===0:filtSet.has(x.dataset.f)));
+    return render();
+  }
+  filt=b.dataset.f;document.querySelectorAll(".tabs button").forEach(x=>x.classList.toggle("on",x===b));render()});
 document.querySelectorAll("#stk button").forEach(b=>b.onclick=()=>{est=b.dataset.s;document.querySelectorAll("#stk button").forEach(x=>x.classList.toggle("on",x===b));render()});
 const LT={e:"Entradas (novos, reabastecidos ou com aumento de saldo)",n:"Itens novos",z:"Itens que zeraram",a:"Itens alterados e novos",s:"Saídas sem zerar o saldo"};
 /* Itens que realmente mudaram em relação à importação anterior */

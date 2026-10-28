@@ -255,11 +255,13 @@ function applySys(){
   $("#q").placeholder=SYS.end?"Buscar por nome, código, rua ou endereço…":"Buscar por nome, código ou descrição…";
   document.querySelector(".hint").innerHTML=SYS.hint;
 }
+const SUPER="elvis.formagio@educa.fumec.sp.gov.br"; // único usuário que gerencia os acessos
+const isSuper=()=>realAdmin&&userEmail===SUPER;
 const podeSys=k=>permErr?true:(realAdmin||myPerm.has(k));
 function aplicarPortal(){
   $("#padm").textContent=(userEmail?userEmail+(realAdmin?" (admin)":"")+" · ":"")+"Sair";
   let n=0;document.querySelectorAll("#portal .tile[data-go]").forEach(t=>{const ok=podeSys(t.dataset.go);t.style.display=ok?"":"none";if(ok)n++});
-  $("#tileacc").style.display=realAdmin&&!preview&&!permErr?"":"none";
+  $("#tileacc").style.display=isSuper()&&!preview&&!permErr?"":"none";
   $("#nop").style.display=userEmail&&!realAdmin&&!n?"block":"none";
 }
 function apply(){
@@ -619,7 +621,7 @@ function uaRender(){
   $("#uac").textContent=`${uaUsers.size} usuário(s)${sem?` · ${sem} sem nenhum sistema liberado`:""}`;
 }
 async function uaAbrir(){
-  if(!realAdmin||preview)return;
+  if(!isSuper()||preview)return;
   $("#uaq").value="";$("#uan").value="";$("#uab").innerHTML='<div class="empty">Carregando…</div>';$("#uac").textContent="";$("#ua").classList.add("on");
   try{await uaCarregar();uaRender()}catch(e){$("#uab").innerHTML=`<div class="empty">Não foi possível carregar: ${esc(e.message||e)}. Rode a seção 12 do SQL no Supabase.</div>`}
 }

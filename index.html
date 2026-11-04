@@ -337,7 +337,7 @@ async function loadPerm(email){
   try{const {data}=await sb.from("gestores_acesso").select("email").eq("email",email);gestor=!!(data&&data.length)}catch(e){gestor=false}
   //  tabela ainda não criada: mantém o acesso liberado até rodar o SQL da seção 12
 }
-function registrarUsuario(email){sb.from("usuarios").upsert({email,ultimo_acesso:new Date().toISOString()},{onConflict:"email"}).then(()=>{},()=>{})}
+function registrarUsuario(email){try{sb.from("usuarios").upsert({email,ultimo_acesso:new Date().toISOString()},{onConflict:"email"}).then(()=>{},()=>{})}catch(e){}}
 async function checkAdmin(email){try{const {data,error}=await sb.from("admins").select("email").eq("email",email).maybeSingle();return !error&&!!data}catch(e){return false}}
 async function applySession(session){
   if(!session){userEmail="";admin=false;realAdmin=false;preview=false;gate(`Acesso restrito aos servidores da FUMEC. Entre com seu e-mail @${DOM}.`,true);return false}
@@ -376,6 +376,13 @@ function render(){
   if(!l.length){$("#list").innerHTML=`<div class="empty">${cur.length?"Nenhum item encontrado.":"Catálogo vazio. Importe a planilha para começar."}</div>`;return}
   $("#list").innerHTML='<div class="grid">'+l.map(i=>{const d=disp(i),off=i.ativo===false;return `<div class="card ${off?"off":""}"><div class="img"><img loading="lazy" src="${esc(i.imagem||ph(i.nome))}" alt="" onerror="this.src='${ph(i.nome)}'"><span class="tag ${d?"ok":"no"}">${d?"Disponível":"Indisponível"}</span>${off&&admin?'<span class="tag dz">Desativado</span>':""}${SYS.semCodigo&&admin&&estBem(i.codigo)?`<span class="tag es ${estBem(i.codigo)==="NOVOS"?"nv":"us"}">${estBem(i.codigo)==="NOVOS"?"Novo":"Usado"}</span>`:""}</div><div class="body">${SYS.semCodigo?"":`<div class="cod">Cód. ${esc(i.codigo)}</div>`}<div class="nm">${esc(i.nome)}</div><div class="ds">${esc(i.descricao)||"Sem descrição"}</div>${admin?`<div class="qt">Quantidade: <b>${Number(i.quantidade)||0}</b></div>`:""}</div>${admin?`<div class="act" data-id="${esc(i._id)}"><button data-a="tog">${off?"Ativar":"Desativar"}</button><button data-a="qtd">Indisponível</button><button data-a="img">Alterar imagem</button><button data-a="edit">Editar</button><button data-a="del" class="dng">Excluir item</button></div>`:""}</div>`}).join("")+"</div>";
 }
+// Bens: endereços da mesma rua e da mesma coluna (letra) ficam na mesma linha, separados por vírgula (ex.: A3, A4, A5)
+function agruparEnds(E){
+  const m=new Map();
+  for(const e of E){const rua=String(e.rua||"").trim(),en=String(e.endereco||"").trim().toUpperCase(),mm=/^([A-Z])(\d+)$/.exec(en),col=mm?mm[1]:en,k=rua+"|"+col;
+    if(!m.has(k))m.set(k,{rua,col,itens:[]});m.get(k).itens.push({en,n:mm?Number(mm[2]):0})}
+  return [...m.values()].sort((a,b)=>a.rua.localeCompare(b.rua,"pt-BR",{numeric:true})||a.col.localeCompare(b.col,"pt-BR")).map(g=>({rua:g.rua,endereco:[...new Set(g.itens.sort((a,b)=>a.n-b.n||a.en.localeCompare(b.en)).map(x=>x.en))].join(", ")}));
+}
 const endsDe=i=>endMap.get(i.estoque+"|"+String(i.codigo).trim())||[];
 function renderEnd(){
   const imp=imps[est],base=items.filter(i=>i.estoque===est&&i.ativo!==false&&Number(i.quantidade)>0);
@@ -396,7 +403,7 @@ function renderEnd(){
     if((ce||se)&&!((ce&&E.length>0)||(se&&E.length===0)))return false;
     return true});
   if(!l.length){$("#list").innerHTML=`<div class="empty">${base.length?"Nenhum item encontrado.":"Nenhum item. Importe a planilha para começar."}</div>`;return}
-  $("#list").innerHTML='<div class="grid">'+l.map(i=>{const E=endsDe(i);return `<div class="card"><div class="img"><img loading="lazy" src="${esc(i.imagem||ph(i.nome))}" alt="" onerror="this.src='${ph(i.nome)}'">${SYS.semCodigo&&estBem(i.codigo)?`<span class="tag es ${estBem(i.codigo)==="NOVOS"?"nv":"us"}">${estBem(i.codigo)==="NOVOS"?"Novo":"Usado"}</span>`:""}</div><div class="body">${SYS.semCodigo?"":`<div class="cod">Cód. ${esc(i.codigo)}</div>`}<div class="nm">${esc(i.nome)}</div>${E.length?E.map(e=>`<div class="loc"><div><small>Rua</small><b>${esc(e.rua||"—")}</b></div><div><small>Endereço</small><b>${esc(e.endereco||"—")}</b></div>${SYS.semCodigo?(estBem(i.codigo)?`<span class="alm ${estBem(i.codigo)==="NOVOS"?"nv":"us"}">${estBem(i.codigo)==="NOVOS"?"Novo":"Usado"}</span>`:""):`<span class="alm ${i.estoque}">${i.estoque==="central"?"Central":"Ceprocamp"}</span>`}</div>`).join(""):'<div class="loc sem">Sem endereço cadastrado</div>'}</div>${admin?`<div class="act" data-id="${esc(i._id)}"><button data-a="end" style="grid-column:1/-1">${E.length?"Alterar endereços":"Definir endereço"}</button></div>`:""}</div>`}).join("")+"</div>";
+  $("#list").innerHTML='<div class="grid">'+l.map(i=>{const E=endsDe(i);return `<div class="card"><div class="img"><img loading="lazy" src="${esc(i.imagem||ph(i.nome))}" alt="" onerror="this.src='${ph(i.nome)}'">${SYS.semCodigo&&estBem(i.codigo)?`<span class="tag es ${estBem(i.codigo)==="NOVOS"?"nv":"us"}">${estBem(i.codigo)==="NOVOS"?"Novo":"Usado"}</span>`:""}</div><div class="body">${SYS.semCodigo?"":`<div class="cod">Cód. ${esc(i.codigo)}</div>`}<div class="nm">${esc(i.nome)}</div>${E.length?(SYS.semCodigo?agruparEnds(E):E).map(e=>`<div class="loc"><div><small>Rua</small><b>${esc(e.rua||"—")}</b></div><div><small>Endereço</small><b>${esc(e.endereco||"—")}</b></div>${SYS.semCodigo?(estBem(i.codigo)?`<span class="alm ${estBem(i.codigo)==="NOVOS"?"nv":"us"}">${estBem(i.codigo)==="NOVOS"?"Novo":"Usado"}</span>`:""):`<span class="alm ${i.estoque}">${i.estoque==="central"?"Central":"Ceprocamp"}</span>`}</div>`).join(""):'<div class="loc sem">Sem endereço cadastrado</div>'}</div>${admin?`<div class="act" data-id="${esc(i._id)}"><button data-a="end" style="grid-column:1/-1">${E.length?"Alterar endereços":"Definir endereço"}</button></div>`:""}</div>`}).join("")+"</div>";
 }
 $("#ruaf").onchange=()=>{ruaSel=$("#ruaf").value;render()};
 let endItem=null;

@@ -999,7 +999,7 @@ async function importCsv(files){
             nome:nomeMudou?n.nome:cur.nome,
             descricao:cur.descricao||"",
             quantidade:q,
-            ativo:cur.ativo!==false,
+            ativo:(SYS.semCodigo&&q>0)?true:cur.ativo!==false, // bens com saldo > 0 voltam a ficar disponíveis
             imagem:cur.imagem||"",
             imp:stamp,
             novo:false,

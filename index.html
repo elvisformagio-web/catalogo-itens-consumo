@@ -285,7 +285,7 @@ let ends=[],endMap=new Map(),endErr=null,ivId=null,items=[],imps={},est="central
 function toast(m,ms=4500){const t=$("#toast");t.textContent=m;t.style.display="block";clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.display="none",ms)}
 const ph=n=>"data:image/svg+xml;utf8,"+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><rect width="400" height="300" fill="#c9ced6"/><text x="200" y="175" font-size="90" text-anchor="middle" fill="#8a919c" font-family="sans-serif">${esc((n||"?").trim()[0]||"?").toUpperCase()}</text></svg>`);
 const docId=c=>String(c).replace(/[^A-Za-z0-9_-]/g,"_").slice(0,150);
-const disp=i=>i.ativo!==false&&Number(i.quantidade)>0;
+const disp=i=>Number(i.quantidade)>0; // disponibilidade depende só do saldo; "desativado" é apenas uma marca do administrador
 async function loadData(){
   // O Supabase/PostgREST limita uma consulta a 1.000 registros por padrão.
   // Aqui carregamos em páginas de 1.000 até não haver mais registros.
@@ -372,7 +372,7 @@ function render(){
   const st=(v,l,c="",k="")=>admin&&k&&Number(v)>0?`<button class="st ${c} clk" data-l="${k}"><b>${v}</b><span>${l} ›</span></button>`:`<div class="st ${c}"><b>${v}</b><span>${l}</span></div>`;
   $("#stats").innerHTML=st(tot,admin&&SYS.est.length>1?"Itens neste almoxarifado":"Itens no catálogo")+st(dp,"Disponíveis","g")+(admin?st(tot-dp,"Indisponíveis","r")+st(imp?imp.novos:"–","Novos na última importação","g","n")+st(imp?items.filter(i=>i.estoque===est&&mesmaImp(i,imp)&&entrada(i)).length:"–","Entradas: novos, reabastecidos ou com aumento","g","e")+st(imp?imp.zerados:"–","Zeraram na última importação","r","z")+st(imp?items.filter(i=>i.estoque===est&&mesmaImp(i,imp)&&saidaSemZerar(i)).length:"–","Saídas sem zerar o saldo","","s")+st(imp?(Number(imp.alterados)||0)+(Number(imp.novos)||0):"–","Itens alterados (inclui novos)","","a"):"");
   $("#last").textContent=!imp?"Nenhuma importação realizada ainda":admin?`Última importação: ${new Date(imp.data).toLocaleString("pt-BR")} · ${imp.arquivo||""} · ${imp.total} linhas`:`Atualizado em ${new Date(imp.data).toLocaleString("pt-BR")}`;
-  const t=term.toLowerCase();const l=cur.filter(i=>{if(t&&!`${i.nome} ${i.codigo} ${i.descricao}`.toLowerCase().includes(t))return false;if(filt==="disp")return disp(i);if(filt==="indisp")return !disp(i)&&i.ativo!==false;if(filt==="desat")return i.ativo===false;if(filt==="novo")return estBem(i.codigo)==="NOVOS";if(filt==="usado")return estBem(i.codigo)==="USADOS";return true});
+  const t=term.toLowerCase();const l=cur.filter(i=>{if(t&&!`${i.nome} ${i.codigo} ${i.descricao}`.toLowerCase().includes(t))return false;if(filt==="disp")return disp(i);if(filt==="indisp")return !disp(i);if(filt==="desat")return i.ativo===false;if(filt==="novo")return estBem(i.codigo)==="NOVOS";if(filt==="usado")return estBem(i.codigo)==="USADOS";return true});
   if(!l.length){$("#list").innerHTML=`<div class="empty">${cur.length?"Nenhum item encontrado.":"Catálogo vazio. Importe a planilha para começar."}</div>`;return}
   $("#list").innerHTML='<div class="grid">'+l.map(i=>{const d=disp(i),off=i.ativo===false;return `<div class="card ${off?"off":""}"><div class="img"><img loading="lazy" src="${esc(i.imagem||ph(i.nome))}" alt="" onerror="this.src='${ph(i.nome)}'"><span class="tag ${d?"ok":"no"}">${d?"Disponível":"Indisponível"}</span>${off&&admin?'<span class="tag dz">Desativado</span>':""}${SYS.semCodigo&&admin&&estBem(i.codigo)?`<span class="tag es ${estBem(i.codigo)==="NOVOS"?"nv":"us"}">${estBem(i.codigo)==="NOVOS"?"Novo":"Usado"}</span>`:""}</div><div class="body">${SYS.semCodigo?"":`<div class="cod">Cód. ${esc(i.codigo)}</div>`}<div class="nm">${esc(i.nome)}</div><div class="ds">${esc(i.descricao)||"Sem descrição"}</div>${admin?`<div class="qt">Quantidade: <b>${Number(i.quantidade)||0}</b></div>`:""}</div>${admin?`<div class="act" data-id="${esc(i._id)}"><button data-a="tog">${off?"Ativar":"Desativar"}</button><button data-a="qtd">Indisponível</button><button data-a="img">Alterar imagem</button><button data-a="edit">Editar</button><button data-a="del" class="dng">Excluir item</button></div>`:""}</div>`}).join("")+"</div>";
 }
@@ -385,7 +385,7 @@ function agruparEnds(E){
 }
 const endsDe=i=>endMap.get(i.estoque+"|"+String(i.codigo).trim())||[];
 function renderEnd(){
-  const imp=imps[est],base=items.filter(i=>i.estoque===est&&i.ativo!==false&&Number(i.quantidade)>0);
+  const imp=imps[est],base=items.filter(i=>i.estoque===est&&Number(i.quantidade)>0);
   const nCom=base.filter(i=>endsDe(i).length).length;
   $("#stats").innerHTML=`<div class="st"><b>${base.length}</b><span>Itens com saldo neste almoxarifado</span></div><div class="st g"><b>${nCom}</b><span>Com endereço</span></div><div class="st r"><b>${base.length-nCom}</b><span>Sem endereço</span></div>`;
   $("#last").textContent=endErr?"Tabela de endereços não encontrada: rode a seção 10 do SQL no Supabase.":!imp?"Nenhuma importação realizada ainda":`Planilha de ${new Date(imp.data).toLocaleString("pt-BR")}`;
@@ -735,7 +735,6 @@ $("#exlay").onclick=async()=>{
       const it=itAll.get(cod),x={rua,end,cod,nome:it?it.nome||"":"",qtd:it?Number(it.quantidade)||0:0};
       const m=/^([A-Z])(\d)$/.exec(end),b=LAYOUT_BANDS.find(b=>b.rua===rua),bi=b&&m?b.l.indexOf(m[1]):-1,lv=m?Number(m[2]):-1;
       if(!it)x.pos="Código sem cadastro neste almoxarifado";
-      else if(it.ativo===false)x.pos="Item desativado (fora do layout)";
       else if(!(x.qtd>0))x.pos="Sem saldo (fora do layout)";
       else if(!b)x.pos=`Rua "${rua}" não existe no layout`;
       else if(bi<0||lv<0||lv>5)x.pos=`Endereço "${end}" não existe na rua ${rua}`;
@@ -999,7 +998,7 @@ async function importCsv(files){
             nome:nomeMudou?n.nome:cur.nome,
             descricao:cur.descricao||"",
             quantidade:q,
-            ativo:(SYS.semCodigo&&q>0)?true:cur.ativo!==false, // bens com saldo > 0 voltam a ficar disponíveis
+            ativo:cur.ativo!==false,
             imagem:cur.imagem||"",
             imp:stamp,
             novo:false,

@@ -368,7 +368,7 @@ async function init(){
   if(ok){try{const rt=sessionStorage.getItem("rt");if(rt){sessionStorage.removeItem("rt");if(!location.hash||location.hash==="#/")location.hash=rt}}catch(e){}fromHash();await start()}
 }
 function render(){
-  applyMode();if(SYS.end)return renderEnd();const imp=imps[est],cur=juntarBens(items.filter(i=>i.estoque===est&&(admin?true:disp(i)))),tot=cur.length,dp=cur.filter(disp).length;
+  applyMode();if(SYS.end)return renderEnd();const imp=imps[est],cur=juntarBens(items.filter(i=>i.estoque===est&&(admin?true:(i.ativo!==false&&disp(i))))),tot=cur.length,dp=cur.filter(disp).length;
   const st=(v,l,c="",k="")=>admin&&k&&Number(v)>0?`<button class="st ${c} clk" data-l="${k}"><b>${v}</b><span>${l} ›</span></button>`:`<div class="st ${c}"><b>${v}</b><span>${l}</span></div>`;
   $("#stats").innerHTML=st(tot,admin&&SYS.est.length>1?"Itens neste almoxarifado":"Itens no catálogo")+st(dp,"Disponíveis","g")+(admin?st(tot-dp,"Indisponíveis","r")+st(imp?imp.novos:"–","Novos na última importação","g","n")+st(imp?items.filter(i=>i.estoque===est&&mesmaImp(i,imp)&&entrada(i)).length:"–","Entradas: novos, reabastecidos ou com aumento","g","e")+st(imp?imp.zerados:"–","Zeraram na última importação","r","z")+st(imp?items.filter(i=>i.estoque===est&&mesmaImp(i,imp)&&saidaSemZerar(i)).length:"–","Saídas sem zerar o saldo","","s")+st(imp?(Number(imp.alterados)||0)+(Number(imp.novos)||0):"–","Itens alterados (inclui novos)","","a"):"");
   $("#last").textContent=!imp?"Nenhuma importação realizada ainda":admin?`Última importação: ${new Date(imp.data).toLocaleString("pt-BR")} · ${imp.arquivo||""} · ${imp.total} linhas`:`Atualizado em ${new Date(imp.data).toLocaleString("pt-BR")}`;
@@ -385,7 +385,7 @@ function agruparEnds(E){
 }
 const endsDe=i=>endMap.get(i.estoque+"|"+String(i.codigo).trim())||[];
 function renderEnd(){
-  const imp=imps[est],base=items.filter(i=>i.estoque===est&&Number(i.quantidade)>0);
+  const imp=imps[est],base=items.filter(i=>i.estoque===est&&(admin||i.ativo!==false)&&Number(i.quantidade)>0);
   const nCom=base.filter(i=>endsDe(i).length).length;
   $("#stats").innerHTML=`<div class="st"><b>${base.length}</b><span>Itens com saldo neste almoxarifado</span></div><div class="st g"><b>${nCom}</b><span>Com endereço</span></div><div class="st r"><b>${base.length-nCom}</b><span>Sem endereço</span></div>`;
   $("#last").textContent=endErr?"Tabela de endereços não encontrada: rode a seção 10 do SQL no Supabase.":!imp?"Nenhuma importação realizada ainda":`Planilha de ${new Date(imp.data).toLocaleString("pt-BR")}`;

@@ -943,6 +943,14 @@ async function importCsv(file){
       const existentes=new Map(items.filter(i=>i.estoque===k).map(i=>[String(i.codigo).trim(),i]));
       const payload=[];
 
+      // Bens permanentes: bem que saiu da planilha = zerou no estoque -> quantidade 0 (indisponível)
+      let ausentes=[];
+      if(SYS.semCodigo){
+        const naPlanilha=new Set(lista.map(n=>n.codigo));
+        ausentes=[...existentes.values()].filter(c=>!naPlanilha.has(String(c.codigo).trim())&&(Number(c.quantidade)||0)>0);
+        if(ausentes.length&&!confirm(`${ausentes.length} bem(ns) cadastrado(s) não aparece(m) mais na planilha.\n\nEles serão marcados como INDISPONÍVEIS, com quantidade 0 (exemplo: ${ausentes.slice(0,3).map(a=>a.nome).join("; ")}${ausentes.length>3?"…":""}).\n\nSe esta planilha estiver incompleta, cancele e envie a correta. Continuar?`)){toast("Importação cancelada. Nada foi gravado.");return}
+      }
+
       for(const n of lista){
         const cur=existentes.get(n.codigo);
         const q=Number(n.quantidade)||0;
@@ -996,6 +1004,11 @@ async function importCsv(file){
         }
       }
 
+      for(const c of ausentes){
+        zeradosTotal++;zeradosEstoque++;alteradosTotal++;alteradosEstoque++;
+        payload.push({id:c._id,estoque:k,codigo:c.codigo,nome:c.nome,descricao:c.descricao||"",quantidade:0,ativo:c.ativo!==false,imagem:c.imagem||"",imp:stamp,novo:false,zer:true,rep:false,ant_nome:"",ant_qtd:Number(c.quantidade)||0});
+      }
+
       // Envia em lotes para não fazer centenas de requisições individuais.
       for(let i=0;i<payload.length;i+=200){
         const lote=payload.slice(i,i+200);
@@ -1023,6 +1036,7 @@ async function importCsv(file){
 
     let msg=`Importação concluída: ${totalGravadas} item(ns) gravado(s) de ${linhasPlanilha} linha(s) da planilha.`;
     msg+=` ${novosTotal} novo(s), ${alteradosTotal} alterado(s), ${semMudancaTotal} sem mudança.`;
+    if(SYS.semCodigo&&zeradosTotal)msg+=` ${zeradosTotal} bem(ns) zerado(s) e marcado(s) como indisponível.`;
     if(ignoradas.length)msg+=` ${ignoradas.length} linha(s) ignorada(s).`;
     toast(msg,20000);
   }catch(e){

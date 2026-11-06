@@ -64,7 +64,12 @@ input,textarea{font:inherit;color:var(--tx);background:var(--card);border:1px so
 .vlg th.nv{left:0;z-index:1}
 .vlg td{border:1px solid var(--bd,#8884);padding:3px 5px;vertical-align:top;min-width:110px;max-width:170px}
 .vlg td.v{background:#8881;color:var(--mut)}
-.vlg td.o{background:#2e7d3226}
+.vlg td.o{background:transparent}
+.vlg .c{padding:2px 4px;border-radius:4px;color:#111}
+.vlg .c.dim{opacity:.18}
+.vlleg{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.vlleg button{font-size:12px;padding:3px 8px;border-radius:999px;color:#111;border:2px solid transparent}
+.vlleg button.on{border-color:#111;font-weight:700}
 .vlg .c{display:block;margin-bottom:2px;line-height:1.25}
 .mod{background:var(--card);border-radius:14px;padding:18px;width:100%;max-width:420px;display:grid;gap:10px}
 .mod label{font-size:13px;color:var(--mut)}
@@ -728,7 +733,10 @@ const LAYOUT_B64="UEsDBBQAAAAIAHZFY11Gx01IlQAAAM0AAAAQAAAAZG9jUHJvcHMvYXBwLnhtbE
 const colL=n=>{let t="";while(n>0){const m=(n-1)%26;t=String.fromCharCode(65+m)+t;n=Math.floor((n-1)/26)}return t};
 const colN=t=>[...t].reduce((a,c)=>a*26+c.charCodeAt(0)-64,0);
 /* ---------- Visualização do layout na tela ---------- */
-let vlRua="1E";
+let vlRua="1E",vlGrp="";
+const VL_STOP=new Set(["de","da","do","das","dos","para","com","sem","e","a","o","em","tipo","kit","c","p"]);
+const vlGrupo=i=>{const w=String(i.nome||"").split(/[\s\/\-,;:()]+/).map(x=>norm(x)).filter(x=>x.length>=3&&!VL_STOP.has(x)&&!/^\d+$/.test(x));return w[0]||"outros"};
+const vlCor=(idx,suave)=>{const h=Math.round((idx*137.508)%360);return suave?`hsl(${h} 70% 82%)`:`hsl(${h} 60% 45%)`};
 const vlRuaN=v=>{const t=String(v??"").toUpperCase().replace(/\bRUA\b/g," "),m=/(\d{1,3})\s*[-\s]*([A-Z])\b/.exec(t);return m?String(parseInt(m[1],10))+m[2]:t.replace(/[\s\-_.\/]/g,"")};
 const vlEndN=v=>{const t=String(v??"").toUpperCase(),m=/\b([A-Z])\s*[-\s]*(\d{1,2})\b/.exec(t);return m?m[1]+String(parseInt(m[2],10)):t.replace(/[\s\-_.\/]/g,"")};
 function vlDesenhar(){
@@ -743,6 +751,11 @@ function vlDesenhar(){
     const key=rua+"|"+m[1]+"|"+m[2];if(!cel.has(key))cel.set(key,[]);cel.get(key).push(i);
     cont[rua]=(cont[rua]||0)+1;
   });
+  // cor por grupo (primeira palavra do nome), estável para o almoxarifado todo
+  const gAll=new Map();it.forEach(i=>{const g=vlGrupo(i);gAll.set(g,(gAll.get(g)||0)+1)});
+  const gOrd=[...gAll.keys()].sort((a,b)=>a.localeCompare(b,"pt-BR")),gIdx=new Map(gOrd.map((g,n)=>[g,n]));
+  const gNome=new Map();it.forEach(i=>{const g=vlGrupo(i);if(!gNome.has(g))gNome.set(g,String(i.nome).split(/[\s\/\-,;:()]+/).find(x=>norm(x)===g)||g)});
+  const naRua=new Set();cel.forEach((l,key)=>{if(key.startsWith(vlRua+"|"))l.forEach(i=>naRua.add(vlGrupo(i)))});
   $("#vlt").textContent=`Layout do porta-palete — ${NOMES[k]}`;
   $("#vltabs").innerHTML=LAYOUT_BANDS.slice().sort((a,b)=>a.rua.localeCompare(b.rua)).map(b=>`<button data-r="${b.rua}" class="${b.rua===vlRua?"on":""}">${b.rua}${cont[b.rua]?` (${cont[b.rua]})`:""}</button>`).join(" ");
   const b=LAYOUT_BANDS.find(x=>x.rua===vlRua);
@@ -753,14 +766,16 @@ function vlDesenhar(){
     for(const L of letras){
       const l=cel.get(b.rua+"|"+L+"|"+lv);
       if(!l){h+='<td class="v">—</td>';continue}
-      h+='<td class="o" title="'+esc(L+lv)+'">'+l.map(i=>{const est2=SYS.semCodigo&&admin?estBem(i.codigo):"";const t=SYS.semCodigo?`${i.nome}${est2?" ("+(est2==="NOVOS"?"novo":"usado")+")":""}`:`<b>${esc(i.codigo)}</b> ${esc(i.nome)}`;return `<span class="c">${SYS.semCodigo?esc(t):t}</span>`}).join("")+"</td>";
+      h+='<td class="o" title="'+esc(L+lv)+'">'+l.map(i=>{const est2=SYS.semCodigo&&admin?estBem(i.codigo):"";const t=SYS.semCodigo?`${i.nome}${est2?" ("+(est2==="NOVOS"?"novo":"usado")+")":""}`:`<b>${esc(i.codigo)}</b> ${esc(i.nome)}`;const g=vlGrupo(i),ix=gIdx.get(g);return `<span class="c${vlGrp&&vlGrp!==g?" dim":""}" style="background:${vlCor(ix,1)};border-left:4px solid ${vlCor(ix,0)}">${SYS.semCodigo?esc(t):t}</span>`}).join("")+"</td>";
     }
     h+="</tr>";
   }
-  $("#vlb").innerHTML=(cont[b.rua]?"":'<div class="empty">Nenhum item com saldo endereçado nesta rua.</div>')+h+"</table>";
+  const leg=[...naRua].sort((a,c)=>gIdx.get(a)-gIdx.get(c)).map(g=>`<button data-g="${esc(g)}" class="${vlGrp===g?"on":""}" style="background:${vlCor(gIdx.get(g),1)}">${esc(String(gNome.get(g)).toUpperCase())}</button>`).join("");
+  $("#vlb").innerHTML=(naRua.size?`<div class="vlleg">${leg}<span style="font-size:12px;color:var(--mut);align-self:center">Cor = grupo pela 1ª palavra do nome. Clique para destacar.</span></div>`:"")+(cont[b.rua]?"":'<div class="empty">Nenhum item com saldo endereçado nesta rua.</div>')+h+"</table>";
 }
 $("#vlay").onclick=()=>{vlDesenhar();$("#vlm").classList.add("on")};
 $("#vltabs").addEventListener("click",e=>{const b=e.target.closest("button[data-r]");if(!b)return;vlRua=b.dataset.r;vlDesenhar()});
+$("#vlb").addEventListener("click",e=>{const b=e.target.closest("button[data-g]");if(!b)return;vlGrp=vlGrp===b.dataset.g?"":b.dataset.g;vlDesenhar()});
 $("#vlx").onclick=()=>$("#vlm").classList.remove("on");
 $("#exlay").onclick=async()=>{
   if(!admin||SYS.semCodigo)return;

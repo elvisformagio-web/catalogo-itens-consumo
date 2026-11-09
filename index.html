@@ -67,6 +67,9 @@ input,textarea{font:inherit;color:var(--tx);background:var(--card);border:1px so
 .vlg td.o{background:transparent}
 .vlg .c{padding:2px 4px;border-radius:4px;color:#111}
 .vlg .c.dim{opacity:.18}
+.vlg.adm .c,.vlg.adm td.v{cursor:pointer}
+.vlg.adm td.v:hover{background:#2e7d3233;color:#111}
+.vlg.adm .c:hover{outline:2px solid #111}
 .vlleg{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
 .vlleg button{font-size:12px;padding:3px 8px;border-radius:999px;color:#111;border:2px solid transparent}
 .vlleg button.on{border-color:#111;font-weight:700}
@@ -227,6 +230,12 @@ header #home,header #logbtn,header #pvbtn{background:transparent;color:#fff;bord
   <div class="sub">Padrão: <b>Rua</b> = número + letra (ex.: 3A) e <b>Endereço</b> = letra + número (ex.: B12). Use mais de uma linha quando o item estiver em mais de um endereço (cargas maiores). Linhas em branco são ignoradas; sem nenhuma linha preenchida, o item fica sem endereço.</div>
   <div class="row"><button id="aec">Cancelar</button><button class="pri" id="aes">Salvar</button></div>
 </div></div>
+<div class="ovl" id="vla"><div class="mod"><b id="vlat"></b><div class="sub" id="vlas"></div>
+  <button id="vlaadd">➕ Incluir outro item neste endereço</button><button id="vlaedit">✏️ Editar endereços deste item</button><button id="vlades" class="dng">🗑 Remover este item deste endereço</button>
+  <div class="row"><button id="vlac">Cancelar</button></div></div></div>
+<div class="ovl" id="vlp"><div class="mod"><b id="vlpt"></b><div class="sub" id="vlps"></div>
+  <input type="search" id="vlpq" placeholder="Buscar item por nome ou código…" autocomplete="off"><select id="vlpl" size="8" style="width:100%"></select>
+  <div class="row"><button id="vlpc">Cancelar</button><button class="pri" id="vlpok">Incluir neste endereço</button></div></div></div>
 <div class="ovl" id="ovl"><div class="mod">
   <b id="mt">Editar</b>
   <div id="fn"><label>Nome</label><input id="mn"></div>
@@ -456,7 +465,7 @@ $("#aes").onclick=async()=>{
     if(novos.length){const {error}=await sb.from("enderecos").insert(novos);if(error)throw error}
     toast(uniq.length?`${uniq.length} endereço(s) salvo(s).`:"Endereços removidos.");
   }catch(e){toast("Não foi possível salvar: "+(e.message||e.code||e),12000)}
-  endItem=null;try{await loadData()}catch(e){}render();
+  endItem=null;try{await loadData()}catch(e){}render();if($("#vlm").classList.contains("on"))vlDesenhar();
 };
 /* ---- importação de endereços por planilha ---- */
 async function lerPlanilha(file){
@@ -748,25 +757,26 @@ function vlDesenhar(){
     const cod=String(e.codigo).trim(),i=it.get(cod);if(!i)return;
     const rua=vlRuaN(e.rua),end=vlEndN(e.endereco),m=/^([A-Z])(\d)$/.exec(end);if(!m)return;
     const kk=rua+"|"+end+"|"+cod;if(vistos.has(kk))return;vistos.add(kk);
-    const key=rua+"|"+m[1]+"|"+m[2];if(!cel.has(key))cel.set(key,[]);cel.get(key).push(i);
+    const key=rua+"|"+m[1]+"|"+m[2];if(!cel.has(key))cel.set(key,[]);cel.get(key).push({i,id:e.id});
     cont[rua]=(cont[rua]||0)+1;
   });
   // cor por grupo (primeira palavra do nome), estável para o almoxarifado todo
   const gAll=new Map();it.forEach(i=>{const g=vlGrupo(i);gAll.set(g,(gAll.get(g)||0)+1)});
   const gOrd=[...gAll.keys()].sort((a,b)=>a.localeCompare(b,"pt-BR")),gIdx=new Map(gOrd.map((g,n)=>[g,n]));
   const gNome=new Map();it.forEach(i=>{const g=vlGrupo(i);if(!gNome.has(g))gNome.set(g,String(i.nome).split(/[\s\/\-,;:()]+/).find(x=>norm(x)===g)||g)});
-  const naRua=new Set();cel.forEach((l,key)=>{if(key.startsWith(vlRua+"|"))l.forEach(i=>naRua.add(vlGrupo(i)))});
+  const naRua=new Set();cel.forEach((l,key)=>{if(key.startsWith(vlRua+"|"))l.forEach(x=>naRua.add(vlGrupo(x.i)))});
   $("#vlt").textContent=`Layout do porta-palete — ${NOMES[k]}`;
   $("#vltabs").innerHTML=LAYOUT_BANDS.slice().sort((a,b)=>a.rua.localeCompare(b.rua)).map(b=>`<button data-r="${b.rua}" class="${b.rua===vlRua?"on":""}">${b.rua}${cont[b.rua]?` (${cont[b.rua]})`:""}</button>`).join(" ");
   const b=LAYOUT_BANDS.find(x=>x.rua===vlRua);
   const letras=b.l.split("");let maxLv=5;cel.forEach((_,key)=>{const p=key.split("|");if(p[0]===b.rua)maxLv=Math.max(maxLv,Number(p[2]))});
-  let h=`<table class="vlg"><tr><th class="nv">Nível \\ Bloco</th>${letras.map(L=>`<th>${L}</th>`).join("")}</tr>`;
+  let h=`<table class="vlg${admin?" adm":""}"><tr><th class="nv">Nível \\ Bloco</th>${letras.map(L=>`<th>${L}</th>`).join("")}</tr>`;
   for(let lv=maxLv;lv>=0;lv--){
     h+=`<tr><th class="nv">${lv===0?"0 (chão)":lv}</th>`;
     for(const L of letras){
       const l=cel.get(b.rua+"|"+L+"|"+lv);
-      if(!l){h+='<td class="v">—</td>';continue}
-      h+='<td class="o" title="'+esc(L+lv)+'">'+l.map(i=>{const est2=SYS.semCodigo&&admin?estBem(i.codigo):"";const t=SYS.semCodigo?`${i.nome}${est2?" ("+(est2==="NOVOS"?"novo":"usado")+")":""}`:`<b>${esc(i.codigo)}</b> ${esc(i.nome)}`;const g=vlGrupo(i),ix=gIdx.get(g);return `<span class="c${vlGrp&&vlGrp!==g?" dim":""}" style="background:${vlCor(ix,1)};border-left:4px solid ${vlCor(ix,0)}">${SYS.semCodigo?esc(t):t}</span>`}).join("")+"</td>";
+      const dk=b.rua+"|"+L+"|"+lv;
+      if(!l){h+=`<td class="v" data-k="${dk}">—</td>`;continue}
+      h+='<td class="o" data-k="'+dk+'" title="'+esc(L+lv)+'">'+l.map(({i,id})=>{const est2=SYS.semCodigo&&admin?estBem(i.codigo):"";const t=SYS.semCodigo?`${i.nome}${est2?" ("+(est2==="NOVOS"?"novo":"usado")+")":""}`:`<b>${esc(i.codigo)}</b> ${esc(i.nome)}`;const g=vlGrupo(i),ix=gIdx.get(g);return `<span class="c${vlGrp&&vlGrp!==g?" dim":""}" data-id="${esc(id)}" data-k="${dk}" data-cod="${esc(i.codigo)}" style="background:${vlCor(ix,1)};border-left:4px solid ${vlCor(ix,0)}">${SYS.semCodigo?esc(t):t}</span>`}).join("")+"</td>";
     }
     h+="</tr>";
   }
@@ -776,6 +786,46 @@ function vlDesenhar(){
 $("#vlay").onclick=()=>{vlDesenhar();$("#vlm").classList.add("on")};
 $("#vltabs").addEventListener("click",e=>{const b=e.target.closest("button[data-r]");if(!b)return;vlRua=b.dataset.r;vlDesenhar()});
 $("#vlb").addEventListener("click",e=>{const b=e.target.closest("button[data-g]");if(!b)return;vlGrp=vlGrp===b.dataset.g?"":b.dataset.g;vlDesenhar()});
+let vlSel=null;
+const vlPos=k=>{const [rua,L,lv]=k.split("|");return{rua,end:L+lv}};
+const vlNome=i=>SYS.semCodigo?`${i.nome}${estBem(i.codigo)?" ("+(estBem(i.codigo)==="NOVOS"?"novo":"usado")+")":""}`:`${i.codigo} — ${i.nome}`;
+async function vlRecarregar(){try{await loadData()}catch(e){}render();vlDesenhar()}
+function vlAbrirPicker(k){
+  vlSel={...vlPos(k)};
+  const jaAqui=new Set(ends.filter(e=>e.estoque===est&&vlRuaN(e.rua)===vlSel.rua&&vlEndN(e.endereco)===vlSel.end).map(e=>String(e.codigo).trim()));
+  vlSel.cand=items.filter(i=>i.estoque===est&&i.ativo!==false&&Number(i.quantidade)>0&&!jaAqui.has(String(i.codigo).trim())).sort((a,b)=>String(a.nome).localeCompare(String(b.nome),"pt-BR"));
+  $("#vlpt").textContent=`Incluir item — Rua ${vlSel.rua}, endereço ${vlSel.end}`;$("#vlps").textContent=NOMES[est];$("#vlpq").value="";vlFiltrar();$("#vlp").classList.add("on");$("#vlpq").focus();
+}
+function vlFiltrar(){const t=$("#vlpq").value.toLowerCase().trim();$("#vlpl").innerHTML=vlSel.cand.filter(i=>!t||`${i.nome} ${i.codigo}`.toLowerCase().includes(t)).slice(0,200).map(i=>`<option value="${esc(i._id)}">${esc(vlNome(i))}</option>`).join("")}
+$("#vlpq").oninput=vlFiltrar;
+$("#vlpc").onclick=()=>$("#vlp").classList.remove("on");
+$("#vlpok").onclick=async()=>{
+  if(!admin||!vlSel)return;const id=$("#vlpl").value;if(!id)return toast("Selecione um item da lista.");
+  const it=items.find(x=>x._id===id);if(!it)return;
+  $("#vlp").classList.remove("on");
+  try{const {error}=await sb.from("enderecos").insert({estoque:it.estoque,codigo:String(it.codigo).trim(),rua:vlSel.rua,endereco:vlSel.end});if(error)throw error;toast(`Item incluído em ${vlSel.rua} ${vlSel.end}.`);}
+  catch(e){toast("Não foi possível incluir: "+(e.message||e.code||e),12000)}
+  await vlRecarregar();
+};
+$("#vlb").addEventListener("click",e=>{
+  if(!admin)return;
+  const c=e.target.closest(".c[data-id]");
+  if(c){const it=items.find(x=>x.estoque===est&&String(x.codigo).trim()===c.dataset.cod);if(!it)return;
+    vlSel={...vlPos(c.dataset.k),it,id:c.dataset.id};
+    $("#vlat").textContent=vlNome(it);$("#vlas").textContent=`Rua ${vlSel.rua}, endereço ${vlSel.end} · ${NOMES[est]}`;$("#vla").classList.add("on");return}
+  const v=e.target.closest("td.v[data-k]");if(v)vlAbrirPicker(v.dataset.k);
+});
+$("#vlac").onclick=()=>$("#vla").classList.remove("on");
+$("#vlaadd").onclick=()=>{const k=vlSel.rua+"|"+vlSel.end[0]+"|"+vlSel.end.slice(1);$("#vla").classList.remove("on");vlAbrirPicker(k)};
+$("#vlaedit").onclick=()=>{const it=vlSel.it;$("#vla").classList.remove("on");openEnd(it)};
+$("#vlades").onclick=async()=>{
+  if(!vlSel||!vlSel.id)return;const {it,rua,end,id}=vlSel;
+  if(!confirm(`Remover ${vlNome(it)} do endereço ${rua} ${end}?`))return;
+  $("#vla").classList.remove("on");
+  try{const {error}=await sb.from("enderecos").delete().eq("id",id);if(error)throw error;toast("Item removido deste endereço.");}
+  catch(e){toast("Não foi possível remover: "+(e.message||e.code||e),12000)}
+  await vlRecarregar();
+};
 $("#vlx").onclick=()=>$("#vlm").classList.remove("on");
 $("#exlay").onclick=async()=>{
   if(!admin||SYS.semCodigo)return;

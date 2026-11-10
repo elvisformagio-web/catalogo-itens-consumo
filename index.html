@@ -716,7 +716,7 @@ $("#uab").addEventListener("click",async e=>{
 });
 $("#logbtn").onclick=async()=>{
   if(!admin)return;
-  $("#alq").value="";$("#alc2").value="";alResumo=false;$("#alb").innerHTML='<div class="empty">Carregando…</div>';$("#alc").textContent="";$("#alog").classList.add("on");
+  $("#alclr").style.display=isPrincipal()?"":"none";$("#alq").value="";$("#alc2").value="";alResumo=false;$("#alb").innerHTML='<div class="empty">Carregando…</div>';$("#alc").textContent="";$("#alog").classList.add("on");
   try{alRows=await alCarregar()}catch(error){$("#alb").innerHTML=`<div class="empty">Não foi possível carregar o log: ${esc(error.message||error)}</div>`;return}
   alRender();
 };
@@ -736,7 +736,7 @@ $("#alf").onclick=()=>$("#alog").classList.remove("on");
 $("#alx").onclick=()=>baixarCsv(alFiltrar(),`log-acessos-${new Date().toISOString().slice(0,10)}.csv`);
 let alBk=false;
 $("#alclr").onclick=()=>{
-  if(!admin)return;alBk=false;
+  if(!isPrincipal())return toast("Apenas o administrador principal pode limpar o histórico do log.",7000);alBk=false;
   $("#alc3m").innerHTML=`Isto apaga <b>todos os ${alRows.length} registro(s)</b> do log de acessos, inclusive o registro de quem apagou itens do catálogo.<br><br><b>Faça o backup antes:</b> clique em "Baixar backup (CSV)" e guarde o arquivo. O botão de limpar só é liberado depois do download.<br><br>Esta ação não pode ser desfeita.`;
   $("#alc3k").disabled=true;$("#alc3k").style.opacity=".5";$("#alc3").classList.add("on");
 };

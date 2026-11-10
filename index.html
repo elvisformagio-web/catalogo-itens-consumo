@@ -554,7 +554,7 @@ function openMod(it,mode){editId=it._id;editMode=mode;$("#mt").textContent=mode=
 $("#ivc").onclick=()=>$("#iv").classList.remove("on");
 $("#ivok").onclick=async()=>{$("#iv").classList.remove("on");if(ivId)await upd(ivId,{quantidade:0},"Item marcado como indisponível (quantidade 0).");ivId=null};
 $("#delall").onclick=()=>{
-  if(!admin)return;
+  if(!isPrincipal())return toast("Apenas o administrador principal pode apagar todos os itens.",7000);
   const n=items.filter(i=>i.estoque===est).length;
   if(!n)return toast("Não há itens para apagar neste catálogo.");
   $("#dam").innerHTML=`Você vai apagar <b>${n} item(ns)</b> de <b>${esc(NOMES[est])}</b> (${esc(SYS.titulo)}). Também serão apagados os indicadores da última importação desse estoque.<br><br><b>Esta ação não pode ser desfeita.</b> Os itens só voltam com uma nova importação da planilha, e descrições, imagens vinculadas e itens desativados serão perdidos.${SYS.est.length>1?"<br><br>Os demais almoxarifados não são alterados.":""}`;
@@ -920,7 +920,7 @@ function setPreview(v){
 $("#pvbtn").onclick=()=>setPreview(true);
 $("#pvback").onclick=()=>setPreview(false);
 function applyMode(){
-  ["#upimg","#up","#delall",".hint",'[data-f="desat"]','[data-f="indisp"]'].forEach(q=>
+  ["#upimg","#up",".hint",'[data-f="desat"]','[data-f="indisp"]'].forEach(q=>
     document.querySelectorAll(q).forEach(e=>e.style.display=admin?"":"none")
   );
   document.querySelectorAll(".tabs .est").forEach(e=>e.style.display=SYS.semCodigo&&admin?"":"none");
@@ -932,6 +932,7 @@ function applyMode(){
      else if(f==="novo"||f==="usado")b.style.display=SYS.semCodigo&&admin?"":"none";
      else if(f==="desat"||f==="indisp")b.style.display=admin?"":"none";
      else b.style.display=""});
+   $("#delall").style.display=admin&&isPrincipal()&&!E?"":"none";
    if(E){["#upimg","#delall"].forEach(q=>document.querySelectorAll(q).forEach(e=>e.style.display="none"));}
    ["#upend","#modend"].forEach(q=>$(q).style.display=E&&admin?"":"none");
    $("#exlay").style.display=E&&admin&&!SYS.semCodigo?"":"none";

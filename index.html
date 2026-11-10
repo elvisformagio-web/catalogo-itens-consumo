@@ -464,6 +464,8 @@ $("#aes").onclick=async()=>{
     const novos=uniq.filter(l=>!l.id).map(l=>({estoque:it.estoque,codigo:String(it.codigo).trim(),rua:l.rua,endereco:l.endereco}));
     if(novos.length){const {error}=await sb.from("enderecos").insert(novos);if(error)throw error}
     toast(uniq.length?`${uniq.length} endereço(s) salvo(s).`:"Endereços removidos.");
+    {const f=o=>`${o.rua} ${o.endereco}`,rem=atuais.filter(e=>!manter.has(String(e.id))).map(f),alt=uniq.filter(l=>l.id).map(l=>{const o=atuais.find(e=>String(e.id)===l.id);return o&&(o.rua!==l.rua||o.endereco!==l.endereco)?`${f(o)} → ${l.rua} ${l.endereco}`:null}).filter(Boolean),add=novos.map(f);
+      if(rem.length||alt.length||add.length)logAlt("endereco_editado",`${logNome(it)} — ${[add.length?"incluído: "+add.join(", "):"",rem.length?"removido: "+rem.join(", "):"",alt.length?"alterado: "+alt.join(", "):""].filter(Boolean).join("; ")}`)}
   }catch(e){toast("Não foi possível salvar: "+(e.message||e.code||e),12000)}
   endItem=null;try{await loadData()}catch(e){}render();if($("#vlm").classList.contains("on"))vlDesenhar();
 };
@@ -531,11 +533,21 @@ $("#endin").onchange=async e=>{
       for(let i=0;i<cods.length;i+=150){const {error}=await sb.from("enderecos").delete().eq("estoque",k).in("codigo",cods.slice(i,i+150));if(error)throw error}
     }
     for(let i=0;i<grava.length;i+=500){const {error}=await sb.from("enderecos").insert(grava.slice(i,i+500));if(error)throw error}
+    logAlt("importacao_enderecos",`${nEnd} endereço(s) para ${nItens} item(ns) — ${NOMES[Object.keys(porK)[0]]||""}${Object.keys(porK).length>1?" e outros":""}`);
     await loadData();render();
     toast(`Endereços importados: ${nEnd} para ${nItens} item(ns).${sem.length?` ${sem.length} código(s) sem cadastro ignorado(s): ${sem.slice(0,5).join(", ")}${sem.length>5?"…":""}.`:""}${invalidas.length?` ${invalidas.length} linha(s) com formato inválido ignorada(s).`:""}`,18000);
   }catch(x){toast("Erro na importação de endereços: "+(x.message||x.code||x),15000)}
 };
-async function upd(id,data,msg){try{const {error}=await sb.from("itens").update(data).eq("id",id);if(error)throw error;if(msg)toast(msg);await loadData()}catch(e){toast("Não foi possível salvar: "+(e.message||e.code))}}
+async function upd(id,data,msg){try{const it0=items.find(x=>x._id===id);const {error}=await sb.from("itens").update(data).eq("id",id);if(error)throw error;if(msg)toast(msg);
+  if(it0){const ks=Object.keys(data),ch=[];
+    if("ativo" in data)ch.push(data.ativo?"ativado":"desativado");
+    if("nome" in data&&data.nome!==it0.nome)ch.push(`nome: “${it0.nome}” → “${data.nome}”`);
+    if("descricao" in data&&(data.descricao||"")!==(it0.descricao||""))ch.push("descrição alterada");
+    if("quantidade" in data&&Number(data.quantidade)!==Number(it0.quantidade))ch.push(`quantidade: ${Number(it0.quantidade)||0} → ${Number(data.quantidade)||0}`);
+    if("imagem" in data)ch.push("imagem trocada");
+    if(ch.length){const ac=ks.length===1&&ks[0]==="ativo"?(data.ativo?"item_ativado":"item_desativado"):ks.length===1&&ks[0]==="imagem"?"item_imagem":(ks.length===1&&ks[0]==="quantidade"&&Number(data.quantidade)===0)?"item_indisponivel":(ks.length===1&&ks[0]==="quantidade")?"item_quantidade":"item_editado";
+      logAlt(ac,`${logNome(it0)}${ac==="item_ativado"||ac==="item_desativado"?"":" — "+ch.join("; ")}`)}}
+  await loadData()}catch(e){toast("Não foi possível salvar: "+(e.message||e.code))}}
 $("#list").addEventListener("click",e=>{const b=e.target.closest("button[data-a]");if(!b)return;const id=b.parentElement.dataset.id,it=items.find(x=>x._id===id);if(!it)return;const a=b.dataset.a;if(a==="end")openEnd(it);else if(a==="tog")upd(id,{ativo:it.ativo===false},it.ativo===false?"Item ativado":"Item desativado");else if(a==="qtd"){if(!(Number(it.quantidade)>0))toast("Este item já está indisponível (quantidade 0).");else{ivId=id;$("#ivn").textContent=`${SYS.semCodigo?"":it.codigo+" — "}${it.nome}`;$("#ivq").textContent=Number(it.quantidade)||0;$("#iv").classList.add("on")}}else if(a==="img"){imgId=id;$("#imgin").click()}else if(a==="del"){delId=id;$("#dn").textContent=`${it.codigo} — ${it.nome}`;$("#dl").classList.add("on")}else openMod(it,a)});
 $("#imgin").onchange=async e=>{const f=e.target.files[0];e.target.value="";if(!f||!imgId)return;try{toast("Enviando imagem…");const path=`${imgId}/${Date.now()}-${f.name.replace(/[^A-Za-z0-9._-]/g,"_")}`;const {error}=await sb.storage.from("imagens").upload(path,f,{upsert:true});if(error)throw error;const {data}=sb.storage.from("imagens").getPublicUrl(path);await upd(imgId,{imagem:data.publicUrl},"Imagem atualizada")}catch(x){toast("Falha no upload: "+(x.message||x.code))}};
 function openMod(it,mode){editId=it._id;editMode=mode;$("#mt").textContent=mode==="qtd"?"Alterar quantidade — "+it.nome:"Editar item";$("#fn").style.display=$("#fd").style.display=mode==="qtd"?"none":"block";$("#mn").value=it.nome||"";$("#md").value=it.descricao||"";$("#mq").value=Number(it.quantidade)||0;$("#ovl").classList.add("on");$("#mq").focus()}
@@ -563,7 +575,7 @@ $("#dak").onclick=async()=>{
   }catch(e){await loadData().catch(()=>{});toast("Não foi possível apagar: "+(e.message||e.code||e),15000)}
 };
 $("#dc").onclick=()=>$("#dl").classList.remove("on");
-$("#dok").onclick=async()=>{$("#dl").classList.remove("on");try{const {error}=await sb.from("itens").delete().eq("id",delId);if(error)throw error;toast("Item excluído.");await loadData()}catch(e){toast("Não foi possível excluir: "+(e.message||e.code))}};
+$("#dok").onclick=async()=>{$("#dl").classList.remove("on");try{const it0=items.find(x=>x._id===delId);const {error}=await sb.from("itens").delete().eq("id",delId);if(error)throw error;toast("Item excluído.");if(it0)logAlt("item_excluido",`${logNome(it0)} (quantidade ${Number(it0.quantidade)||0})`);await loadData()}catch(e){toast("Não foi possível excluir: "+(e.message||e.code))}};
 $("#mc").onclick=()=>$("#ovl").classList.remove("on");
 $("#ms").onclick=async()=>{const q=Math.max(0,parseFloat($("#mq").value)||0),d={quantidade:q};if(editMode==="edit"){d.nome=$("#mn").value.trim()||"Sem nome";d.descricao=$("#md").value.trim()}$("#ovl").classList.remove("on");await upd(editId,d,"Item atualizado")};
 $("#q").oninput=e=>{term=e.target.value;render()};
@@ -598,12 +610,19 @@ function registrarAcesso(email,cat){
   }catch(e){}
   sb.from("acessos").insert({email,catalogo:cat}).then(()=>{},()=>{});
 }
+// Registra no log qualquer alteração de cadastro/endereço (não bloqueia nem quebra a ação principal)
+function logAlt(acao,detalhe){try{Promise.resolve(registrarAcao(acao,String(detalhe||"").slice(0,900),cur)).catch(()=>{})}catch(e){}}
+const logNome=it=>it?`${SYS.semCodigo?"":it.codigo+" — "}${it.nome}${SYS.semCodigo&&estBem(it.codigo)?" ("+(estBem(it.codigo)==="NOVOS"?"novo":"usado")+")":""} · ${NOMES[it.estoque]||it.estoque}`:"(item)";
 async function registrarAcao(acao,detalhe,cat){
   const {error}=await sb.from("acessos").insert({email:userEmail,catalogo:CATN[cat]?cat:"inicio",acao,detalhe});
   return error||null;
 }
 let alRows=[],alResumo=false;
-const ACAON={apagar_todos:"⚠ Apagou todos os itens",limpar_log:"🧹 Limpou o histórico do log"};
+const ACAON={apagar_todos:"⚠ Apagou todos os itens",limpar_log:"🧹 Limpou o histórico do log",
+  item_ativado:"✅ Ativou item",item_desativado:"⛔ Desativou item",item_editado:"✏️ Editou item",item_quantidade:"🔢 Alterou quantidade",item_indisponivel:"🚫 Marcou item como indisponível",item_imagem:"🖼 Alterou imagem do item",item_excluido:"🗑 Excluiu item",
+  importacao_planilha:"⬆ Importou planilha",importacao_imagens:"🖼 Importou imagens",importacao_enderecos:"📍 Importou endereços",
+  endereco_editado:"📍 Editou endereços do item",endereco_incluido:"📍 Incluiu endereço",endereco_removido:"📍 Removeu endereço"};
+const ACAO_GRAVE=new Set(["apagar_todos","limpar_log","item_excluido"]);
 async function alCarregar(){
   let cols="email,criado_em,catalogo,acao,detalhe",out=[];
   for(let a=0;;a+=1000){
@@ -631,7 +650,7 @@ function alRender(){
     h=`<table class="lg2"><thead><tr><th>E-mail</th><th>Catálogo</th><th>Último acesso</th><th>Acessos</th></tr></thead><tbody>${l.map(o=>`<tr><td>${esc(o.email)}</td><td>${esc(o.cat)}</td><td>${esc(fdh(o.ult))}</td><td>${o.n}</td></tr>`).join("")}</tbody></table>`;
     $("#alc").textContent=`${l.length} linha(s) no resumo`;
   }else{
-    h=`<table class="lg2"><thead><tr><th>Data e horário</th><th>E-mail</th><th>Catálogo</th><th>Ação</th></tr></thead><tbody>${rows.map(r=>`<tr${r.acao?' style="background:var(--nob)"':""}><td>${esc(fdh(r.criado_em))}</td><td>${esc(r.email)}</td><td>${esc(alCat(r))}</td><td>${r.acao?`<b>${esc(ACAON[r.acao]||r.acao)}</b>${r.detalhe?"<br><span class=\"sub\">"+esc(r.detalhe)+"</span>":""}`:"Acesso"}</td></tr>`).join("")}</tbody></table>`;
+    h=`<table class="lg2"><thead><tr><th>Data e horário</th><th>E-mail</th><th>Catálogo</th><th>Ação</th></tr></thead><tbody>${rows.map(r=>`<tr${r.acao&&ACAO_GRAVE.has(r.acao)?' style="background:var(--nob)"':""}><td>${esc(fdh(r.criado_em))}</td><td>${esc(r.email)}</td><td>${esc(alCat(r))}</td><td>${r.acao?`<b>${esc(ACAON[r.acao]||r.acao)}</b>${r.detalhe?"<br><span class=\"sub\">"+esc(r.detalhe)+"</span>":""}`:"Acesso"}</td></tr>`).join("")}</tbody></table>`;
     $("#alc").textContent=`${rows.length} registro(s)`;
   }
   $("#alb").innerHTML=rows.length?h:'<div class="empty">Nenhum registro encontrado.</div>';
@@ -803,7 +822,7 @@ $("#vlpok").onclick=async()=>{
   if(!admin||!vlSel)return;const id=$("#vlpl").value;if(!id)return toast("Selecione um item da lista.");
   const it=items.find(x=>x._id===id);if(!it)return;
   $("#vlp").classList.remove("on");
-  try{const {error}=await sb.from("enderecos").insert({estoque:it.estoque,codigo:String(it.codigo).trim(),rua:vlSel.rua,endereco:vlSel.end});if(error)throw error;toast(`Item incluído em ${vlSel.rua} ${vlSel.end}.`);}
+  try{const {error}=await sb.from("enderecos").insert({estoque:it.estoque,codigo:String(it.codigo).trim(),rua:vlSel.rua,endereco:vlSel.end});if(error)throw error;toast(`Item incluído em ${vlSel.rua} ${vlSel.end}.`);logAlt("endereco_incluido",`${logNome(it)} → ${vlSel.rua} ${vlSel.end}`)}
   catch(e){toast("Não foi possível incluir: "+(e.message||e.code||e),12000)}
   await vlRecarregar();
 };
@@ -822,7 +841,7 @@ $("#vlades").onclick=async()=>{
   if(!vlSel||!vlSel.id)return;const {it,rua,end,id}=vlSel;
   if(!confirm(`Remover ${vlNome(it)} do endereço ${rua} ${end}?`))return;
   $("#vla").classList.remove("on");
-  try{const {error}=await sb.from("enderecos").delete().eq("id",id);if(error)throw error;toast("Item removido deste endereço.");}
+  try{const {error}=await sb.from("enderecos").delete().eq("id",id);if(error)throw error;toast("Item removido deste endereço.");logAlt("endereco_removido",`${logNome(it)} ✕ ${rua} ${end}`)}
   catch(e){toast("Não foi possível remover: "+(e.message||e.code||e),12000)}
   await vlRecarregar();
 };
@@ -1155,6 +1174,7 @@ async function importCsv(files){
     if(SYS.semCodigo&&zeradosTotal)msg+=` ${zeradosTotal} bem(ns) zerado(s) e marcado(s) como indisponível.`;
     if(ignoradas.length)msg+=` ${ignoradas.length} linha(s) ignorada(s).`;
     toast(msg,20000);
+    logAlt("importacao_planilha",`${files.length>1?files.length+" planilhas: "+files.map(f=>f.name).join(", "):files[0].name} — ${msg.replace("Importação concluída: ","")}`);
   }catch(e){
     console.error("Erro na importação:",e);
     toast("Erro na importação: "+(e.message||e.code||String(e)),18000);
@@ -1194,6 +1214,7 @@ async function importImgs(files){
       }catch(e){fail++;erros.push(`${f.name}: ${e.message||e}`)}
     }));
   }
+  logAlt("importacao_imagens",`${ok} imagem(ns) atualizada(s)${fail?`, ${fail} com falha`:""}${sem.length?`, ${sem.length} sem cadastro`:""}`);
   await loadData();let msg=`${ok} imagem(ns) atualizada(s)`;if(sem.length)msg+=` · ${sem.length} sem cadastro com esse código (ex.: ${sem.slice(0,3).join(", ")})`;if(erros.length)msg+=` · ${fail} com falha: ${erros.slice(0,2).join(" | ")}`;toast(msg,18000)
 }
 

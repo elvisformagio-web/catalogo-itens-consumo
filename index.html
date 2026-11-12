@@ -399,7 +399,7 @@ async function rCarregar(){
     if(!c&&p.qi>0)c=p.vi/p.qi;
     p.custo=c||0;
   }
-  REL={prods,cov,cargas,val:val.map(v=>({est:v.estoque,cod:String(v.codigo),lote:v.lote||"",t:rMs(v.validade),qtd:v.qtd==null?null:+v.qtd,desc:v.descricao||""}))};
+  REL={prods,cov,cargas,val:val.map(v=>({est:v.estoque,cod:String(v.codigo),lote:v.lote||"",forn:v.fornecedor||"",t:rMs(v.validade),qtd:v.qtd==null?null:+v.qtd,desc:v.descricao||""}))};
   return REL;
 }
 
@@ -504,8 +504,9 @@ const rHB=(rows,fmt,cor)=>{const max=Math.max(1e-9,...rows.map(r=>r[1]));return 
 /* ---------- vencimentos ---------- */
 function rVenc(all){
   const hoje=Date.UTC(new Date().getFullYear(),new Date().getMonth(),new Date().getDate()),mp=new Map(all.map(c=>[c.P.k,c]));
-  const L=[];for(const v of REL.val){const c=mp.get(v.est+"|"+v.cod);if(!c)continue;
-    const q=v.qtd==null?c.saldo:Math.min(v.qtd,c.saldo||v.qtd);L.push({c,v,dias:Math.round((v.t-hoje)/RDAY),q,valor:q*c.P.custo})}
+  const L=[];for(const v of REL.val){let c=mp.get(v.est+"|"+v.cod);
+    if(!c){if(RS.est!=="todos"&&RS.est!==v.est)continue;c={P:{k:v.est+"|"+v.cod,est:v.est,cod:v.cod,desc:v.desc||"(sem cadastro no consumo)",custo:0},saldo:v.qtd||0,aRef:null,semConsumo:true}}
+    const q=v.qtd==null?c.saldo:v.qtd;L.push({c,v,dias:Math.round((v.t-hoje)/RDAY),q,valor:q*c.P.custo})}
   L.sort((a,b)=>a.v.t-b.v.t);
   const S={venc:0,d30:0,d60:0,d90:0,vv:0,v30:0,v90:0};
   for(const x of L){if(x.dias<0){S.venc++;S.vv+=x.valor}else if(x.dias<=30){S.d30++;S.v30+=x.valor}else if(x.dias<=60)S.d60++;else if(x.dias<=90)S.d90++;if(x.dias>=0&&x.dias<=90)S.v90+=x.valor}
@@ -783,7 +784,7 @@ function rComparativo(per,J){
 function rVencTab(V){
   if(!V.tem)return`<div class="rl-card"><h3>Itens próximos ao vencimento</h3><div class="sub">As planilhas de movimentação não trazem validade. ${admin?'Use <b>Importar validades</b> (lote, validade e quantidade por item) para ver os itens a vencer.':"Peça a um administrador para importar a planilha de validades."}</div></div>`;
   const L=V.L.filter(x=>x.dias<=120).slice(0,25);
-  return`<div class="rl-card"><h3>Itens próximos ao vencimento <span class="sub">(até 120 dias e vencidos)</span></h3>${L.length?`<div class="rl-tbl"><table class="rl-t"><thead><tr><th>Almox.</th><th>Código</th><th>Item</th><th>Lote</th><th>Validade</th><th class="n">Dias</th><th class="n">Qtd.</th><th class="n">Valor</th><th class="n">Autonomia</th></tr></thead><tbody>${L.map(x=>`<tr><td>${x.c.P.est==="central"?"Central":"Ceprocamp"}</td><td>${esc(x.c.P.cod)}</td><td>${esc(x.c.P.desc)}</td><td>${esc(x.v.lote)}</td><td>${rBr(x.v.t)}</td><td class="n"><span class="rtag ${x.dias<0?"no":x.dias<=30?"no":x.dias<=90?"wn":"gr"}">${x.dias<0?"vencido":x.dias+" d"}</span></td><td class="n">${rN(x.q)}</td><td class="n">${rBRL(x.valor)}</td><td class="n">${rA(x.c.aRef)} m</td></tr>`).join("")}</tbody></table></div>`:'<div class="sub">Nenhum item vence nos próximos 120 dias.</div>'}</div>`;
+  return`<div class="rl-card"><h3>Itens próximos ao vencimento <span class="sub">(até 120 dias e vencidos)</span></h3>${L.length?`<div class="rl-tbl"><table class="rl-t"><thead><tr><th>Almox.</th><th>Código</th><th>Item</th><th>Lote</th><th>Fornecedor</th><th>Validade</th><th class="n">Dias</th><th class="n">Qtd.</th><th class="n">Valor</th><th class="n">Autonomia</th></tr></thead><tbody>${L.map(x=>`<tr><td>${x.c.P.est==="central"?"Central":"Ceprocamp"}</td><td>${esc(x.c.P.cod)}</td><td>${esc(x.c.P.desc)}</td><td>${esc(x.v.lote)}</td><td>${esc(x.v.forn)}</td><td>${rBr(x.v.t)}</td><td class="n"><span class="rtag ${x.dias<0?"no":x.dias<=30?"no":x.dias<=90?"wn":"gr"}">${x.dias<0?"vencido":x.dias+" d"}</span></td><td class="n">${rN(x.q)}</td><td class="n">${rBRL(x.valor)}</td><td class="n">${x.c.aRef==null?"—":rA(x.c.aRef)+" m"}</td></tr>`).join("")}</tbody></table></div>`:'<div class="sub">Nenhum item vence nos próximos 120 dias.</div>'}</div>`;
 }
 const R_COLS=[["est","Almox.",c=>c.P.est],["cod","Código",c=>+c.P.cod||c.P.cod],["desc","Descrição",c=>c.P.desc],["saldo","Saldo",c=>c.saldo],["valor","Valor estoque",c=>c.valor],["ent","Entradas",c=>c.per.compraQ],["sai","Saídas",c=>c.per.saiQ],["liq","Consumo líq.",c=>c.per.liqQ],["m12","Média 12m",c=>c.a12.mQ],["m3","Média 3m",c=>c.a3.mQ],["var","Δ 3m×12m",c=>c.var3==null?-9e9:c.var3],["aut12","Autonomia 12m",c=>c.aut12==null?9e9:c.aut12],["aut3","Autonomia 3m",c=>c.aut3==null?9e9:c.aut3],["dias","Cobertura (dias)",c=>c.aRef==null?9e9:c.aRef*30.4375],["sem","Dias s/ saída",c=>c.diasSem],["abc","ABC",c=>c.abcV],["xyz","XYZ",c=>c.xyz],["status","Situação",c=>c.status]];
 function rTabela(vis,per){
@@ -840,19 +841,19 @@ async function rImportarVal(files){
     for(const f of files){
       const rows=await lerPlanilha(f);if(rows.length<2)throw new Error(`${f.name}: planilha vazia.`);
       const h=rows.shift().map(norm),c=a=>h.findIndex(x=>a.includes(x));
-      const iC=c(["codigo","codproduto","codreduzido","cod"]),iP=c(["descrproduto","produto"]),iV=c(["validade","vencimento","dtvalidade","dtvencimento","datavalidade","datavencimento"]),iL=c(["lote","nlote"]),iQ=c(["qtd","quantidade","qtlote","saldo","qtatual"]),iA=c(["nomealmox","almoxarifado"]);
-      if(iV<0||(iC<0&&iP<0))throw new Error(`${f.name}: a planilha precisa das colunas CODIGO (ou DESCR_PRODUTO) e VALIDADE.`);
+      const iC=c(["codreduzido","codigo","codproduto","cod"]),iP=c(["descrproduto","produto"]),iV=c(["validade","vencimento","dtvalidade","dtvencimento","datavalidade","datavencimento"]),iL=c(["numlote","lote","nlote"]),iQ=c(["qttotal","qtd","quantidade","qtlote","saldo","qtatual"]),iA=c(["nomealmox","almoxarifado"]),iF=c(["nomefornecedor","fornecedor"]);
+      if(iV<0||(iC<0&&iP<0))throw new Error(`${f.name}: a planilha precisa das colunas COD_REDUZIDO (ou CODIGO) e DT_VALIDADE.`);
       let est=iA<0?stockOf(f.name):null;
       if(iA<0&&!est)est=confirm(`A planilha “${f.name}” não tem a coluna NOME_ALMOX.\n\nOK = Almoxarifado Central\nCancelar = Almoxarifado Ceprocamp`)?"central":"ceprocamp";
       const por={};let ign=0;
       for(const r of rows){const e=(iA>=0?stockOf(r[iA]):null)||est,t=rData(r[iV]);let cod=iC>=0?String(r[iC]).trim():"";if(!cod&&iP>=0)cod=rProd(r[iP]).cod;
         if(!e||!cod||t==null){ign++;continue}
-        (por[e]=por[e]||[]).push({estoque:e,codigo:cod.replace(/\.0+$/,""),descricao:iP>=0?rProd(r[iP]).desc:"",lote:iL>=0?fx(r[iL]):"",validade:rIso(t),qtd:iQ>=0&&String(r[iQ]).trim()!==""?rNumP(r[iQ]):null})}
+        (por[e]=por[e]||[]).push({estoque:e,codigo:cod.replace(/\.0+$/,""),descricao:iP>=0?(iC>=0?fx(r[iP]):rProd(r[iP]).desc):"",lote:iL>=0?fx(r[iL]):"",fornecedor:iF>=0?fx(r[iF]):"",validade:rIso(t),qtd:iQ>=0&&String(r[iQ]).trim()!==""?rNumP(r[iQ]):null})}
       for(const [e,L] of Object.entries(por)){
         if(!confirm(`Importar ${L.length} lote(s)/validade(s) para o ${RNOMEST[e]}?\n\nAs validades já cadastradas desse almoxarifado serão substituídas.${ign?`\n(${ign} linha(s) ignorada(s) por falta de código ou data)`:""}`))continue;
         toast("Gravando validades…",60000);
         let r=await sb.from("consumo_validade").delete().eq("estoque",e);if(r.error)throw r.error;
-        for(let i=0;i<L.length;i+=500){r=await sb.from("consumo_validade").insert(L.slice(i,i+500));if(r.error)throw r.error}
+        for(let i=0;i<L.length;i+=500){const lote=L.slice(i,i+500);r=await sb.from("consumo_validade").insert(lote);if(r.error&&/fornecedor/i.test(r.error.message||"")){r=await sb.from("consumo_validade").insert(lote.map(({fornecedor,...x})=>x))}if(r.error)throw r.error}
         logAlt("importacao_validades",`${RNOMEST[e]}: ${L.length} lote(s) — ${f.name}`);
       }
     }
@@ -882,7 +883,7 @@ async function relEnter(force){
   rEl("rfile").onchange=e=>{const f=[...e.target.files];e.target.value="";if(f.length)rImportar(f)};
   rEl("rvalbtn").onclick=()=>rEl("rvalfile").click();
   rEl("rvalfile").onchange=e=>{const f=[...e.target.files];e.target.value="";if(f.length)rImportarVal(f)};
-  rEl("rmodval").onclick=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob(["﻿NOME_ALMOX;CODIGO;DESCR_PRODUTO;LOTE;VALIDADE;QTD\r\nAlmoxarifado Central (FUMEC);106108;VASSOURA TIPO CAIPIRA;L001;31/12/2026;20\r\n"],{type:"text/csv;charset=utf-8"}));a.download="modelo-validades.csv";document.body.appendChild(a);a.click();a.remove()};
+  rEl("rmodval").onclick=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob(["﻿NOME_ALMOX;DT_VALIDADE;COD_REDUZIDO;DESCR_PRODUTO;NUM_LOTE;REGISTRO_LOTE;QT_TOTAL;NOME_FORNECEDOR;ID_ALMOX\r\nAlmoxarifado Central (FUMEC);31/12/2026;73660;TOALHA DE PAPEL - PACOTE 1000 FOLHAS;L12/2026;;40;NOME DO FORNECEDOR;389\r\n"],{type:"text/csv;charset=utf-8"}));a.download="modelo-validades.csv";document.body.appendChild(a);a.click();a.remove()};
   rEl("rimpc").onclick=()=>{RIMP=null;rEl("rimpm").classList.remove("on")};
   rEl("rimpok").onclick=rGravarImport;
   rEl("rimpb").addEventListener("input",e=>{const i=e.target.dataset.i;if(i!=null&&RIMP)RIMP[i][e.target.dataset.k]=e.target.value});

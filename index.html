@@ -408,6 +408,10 @@ async function rCarregar(){
 function rJanelas(ate){return{a12:rAddM(ate,-12)+RDAY,a3:rAddM(ate,-3)+RDAY}}
 function rCalc(P,de,ate,J){
   const cov=REL.cov[P.est]||{ini:de,fim:ate};
+  // início da "vida" do item no almoxarifado: se já havia saldo no começo do histórico, vale o início do histórico;
+  // se o item nasceu de uma compra dentro do histórico, vale a data da 1ª compra
+  let prim=null;for(const m of P.movs){if(m.qe>0&&(m.tipo==="compra"||m.tipo==="outra_entrada")){prim=m.t;break}}
+  const vidaExata=!(P.qi>0||prim==null),vidaIni=vidaExata?Math.max(prim,cov.ini):cov.ini,vidaDias=Math.max(0,(ate-vidaIni)/RDAY+1);
   const W=(a,b)=>{
     const r={compraQ:0,compraV:0,devQ:0,devV:0,estQ:0,estV:0,saiQ:0,saiV:0,n:0};
     for(const m of P.movs){if(m.t<a||m.t>b)continue;r.n++;
@@ -425,7 +429,7 @@ function rCalc(P,de,ate,J){
   const mRef=Math.max(a12.mQ,a3.mQ,0),aRef=mRef>0?saldo/mRef:null;
   let status;
   if(saldo<=0)status=mRef>0?"ruptura":"semsaldo";
-  else if(mRef<=0)status="parado";
+  else if(mRef<=0)status=vidaDias<90?"recente":"parado";
   else if(aRef<=1)status="critico";else if(aRef<=3)status="atencao";else if(aRef<=12)status="adequado";else status="excesso";
   const excedente=status==="excesso"?(saldo-12*mRef)*P.custo:0;
   // consumo mensal nos 12 meses até 'ate' (regularidade XYZ) e dias sem saída
@@ -438,12 +442,12 @@ function rCalc(P,de,ate,J){
   const xyz=soma<=0?"-":obs.length<3?"n/d":cv<=0.5?"X":cv<=1?"Y":"Z";
   const mesesCons=arr.filter(x=>x>0).length;
   let ult=null;for(const m of P.movs){if(m.t<=ate&&m.qs>0&&m.tipo!=="compra"&&m.tipo!=="outra_entrada"&&m.tipo!=="devolucao"&&m.tipo!=="estorno")ult=m.t}
-  const semSaidaTodo=ult==null,diasSem=ult==null?Math.max(0,(ate-cov.ini)/RDAY+1):(ate-ult)/RDAY;
+  const semSaidaTodo=ult==null,diasSem=ult==null?vidaDias:Math.max(0,(ate-Math.max(ult,vidaIni))/RDAY);
   const parado180=saldo>0&&diasSem>=180;
-  return{P,saldo,valor,per,a12,a3,ult,xyz,cv,mesesCons,semSaidaTodo,diasSem,parado180,autP:aut(per.mQ),aut12:aut(a12.mQ),aut3:aut(a3.mQ),mRef,aRef,status,excedente,parado:status==="parado"?valor:0,
+  return{P,saldo,valor,per,a12,a3,ult,vidaIni,vidaDias,vidaExata,xyz,cv,mesesCons,semSaidaTodo,diasSem,parado180,autP:aut(per.mQ),aut12:aut(a12.mQ),aut3:aut(a3.mQ),mRef,aRef,status,excedente,parado:status==="parado"?valor:0,
     var3:a12.mQ>0?(a3.mQ-a12.mQ)/a12.mQ:null};
 }
-const R_ST={ruptura:["Ruptura","no"],critico:["Crítico","no"],atencao:["Atenção","wn"],adequado:["Adequado","ok"],excesso:["Excesso","in"],parado:["Parado","gr"],semsaldo:["Sem saldo/uso","gr"]};
+const R_ST={ruptura:["Ruptura","no"],critico:["Crítico","no"],atencao:["Atenção","wn"],adequado:["Adequado","ok"],excesso:["Excesso","in"],parado:["Parado","gr"],recente:["Recente (menos de 90 dias)","in"],semsaldo:["Sem saldo/uso","gr"]};
 function rAgg(L){
   const A={c3V:0,c12V:0,n:L.length,comSaldo:0,valor:0,compraV:0,compraQ:0,saiV:0,liqV:0,revV:0,mV12:0,mV3:0,mVP:0,critico:0,ruptura:0,parado:0,paradoV:0,excesso:0,excessoV:0,st:{}};
   for(const c of L){
@@ -615,7 +619,7 @@ function rKPIs(A,V,X,S){
 function rAbaGeral(X,A,V){
   const {per,all}=X,gran=RS.gran,S=rSerie(all,per,gran),lb=S.map(s=>s.label);
   const gnome={m:"mês",t:"trimestre",a:"ano"}[gran];
-  const ordem=["ruptura","critico","atencao","adequado","excesso","parado","semsaldo"],cor={ruptura:"var(--no)",critico:"var(--no)",atencao:"#d98200",adequado:"var(--ok)",excesso:"var(--pri)",parado:"var(--off)",semsaldo:"var(--bd)"};
+  const ordem=["ruptura","critico","atencao","adequado","excesso","parado","recente","semsaldo"],cor={recente:"#6aa0e8",ruptura:"var(--no)",critico:"var(--no)",atencao:"#d98200",adequado:"var(--ok)",excesso:"var(--pri)",parado:"var(--off)",semsaldo:"var(--bd)"};
   const cobH=ordem.map(s=>[R_ST[s][0],A.st[s]||0,s]),mx=Math.max(1,...cobH.map(x=>x[1]));
   const top=k=>[...all].filter(c=>c.per[k]>0).sort((a,b)=>b.per[k]-a.per[k]).slice(0,10);
   return rKPIs(A,V,X)+`<div class="rl-grid2"><div class="rl-card"><h3>Entradas × custo de consumo por ${gnome} <span class="sub">(R$)</span> <select id="rgran" class="rl-sel"><option value="m"${gran==="m"?" selected":""}>mensal</option><option value="t"${gran==="t"?" selected":""}>trimestral</option><option value="a"${gran==="a"?" selected":""}>anual</option></select></h3><div class="rl-leg"><i style="background:var(--pri)"></i>Entradas (compras) <i style="background:var(--acc)"></i>Consumo líquido</div>${rBarras(lb,S.map(s=>s.compra),S.map(s=>s.liq),"Entradas","Consumo líquido")}</div>
@@ -678,13 +682,13 @@ function rAbaCustos(X,A){
 function rAbaEstoque(X,A,V){
   const {per,all}=X,dias=per.ate-per.ini>=0?(per.ate-per.ini)/RDAY+1:0;
   const th=[90,180,365],cov=c=>(per.ate-(REL.cov[c.P.est]||{ini:per.ini}).ini)/RDAY+1;
-  const rows=th.map(t=>{const L=all.filter(c=>c.saldo>0&&(c.semSaidaTodo?cov(c)>=t:c.diasSem>=t));const v=L.reduce((s,c)=>s+c.valor,0);
+  const rows=th.map(t=>{const L=all.filter(c=>c.saldo>0&&c.diasSem>=t);const v=L.reduce((s,c)=>s+c.valor,0);
     return{t,L,n:L.length,q:L.reduce((s,c)=>s+c.saldo,0),v,p:A.valor>0?v/A.valor:0,ok:dias>=t}});
   const S=rSerie(all,per,"m");
-  const piores=[...all].filter(c=>c.saldo>0&&(c.semSaidaTodo||c.diasSem>=90)).sort((a,b)=>b.valor-a.valor).slice(0,20);
-  return`<div class="rl-card"><h3>Obsolescência — estoque parado <span class="sub">(itens com saldo e sem saída — QT_SAÍDA = 0 — há 90, 180 ou 365 dias)</span></h3><div class="rl-tbl"><table class="rl-t"><thead><tr><th>Sem saída há</th><th class="n">Itens</th><th class="n">Unidades</th><th class="n">Valor imobilizado</th><th class="n">% do valor em estoque</th></tr></thead><tbody>${rows.map(r=>`<tr data-par="${r.t}" class="rl-click" title="Clique para listar os itens na aba Itens"><td>≥ ${r.t} dias${r.ok?"":' <span class="sub">(histórico importado menor que isso)</span>'}</td><td class="n">${rN(r.n)}</td><td class="n">${rN(r.q)}</td><td class="n">${rBRL(r.v)}</td><td class="n">${rN(100*r.p,1)}%</td></tr>`).join("")}</tbody></table></div><div class="sub" style="margin-top:6px">Clique numa linha para ver os itens na aba “Itens”. Limitado ao histórico importado: item sem nenhuma saída no histórico conta como parado desde o início dos dados.</div></div>
+  const piores=[...all].filter(c=>c.saldo>0&&c.diasSem>=90).sort((a,b)=>b.valor-a.valor).slice(0,20);
+  return`<div class="rl-card"><h3>Obsolescência — estoque parado <span class="sub">(itens com saldo e sem saída — QT_SAÍDA = 0 — há 90, 180 ou 365 dias)</span></h3><div class="rl-tbl"><table class="rl-t"><thead><tr><th>Sem saída há</th><th class="n">Itens</th><th class="n">Unidades</th><th class="n">Valor imobilizado</th><th class="n">% do valor em estoque</th></tr></thead><tbody>${rows.map(r=>`<tr data-par="${r.t}" class="rl-click" title="Clique para listar os itens na aba Itens"><td>≥ ${r.t} dias${r.ok?"":' <span class="sub">(histórico importado menor que isso)</span>'}</td><td class="n">${rN(r.n)}</td><td class="n">${rN(r.q)}</td><td class="n">${rBRL(r.v)}</td><td class="n">${rN(100*r.p,1)}%</td></tr>`).join("")}</tbody></table></div><div class="sub" style="margin-top:6px">Clique numa linha para ver os itens na aba “Itens”. O tempo parado conta desde a <b>última saída</b> ou, se o item nunca saiu, desde a <b>1ª compra</b> registrada (item novo não é obsoleto). Itens que já tinham saldo no início do histórico contam desde o início dos dados.</div></div>
   <div class="rl-grid2"><div class="rl-card"><h3>Taxa de ruptura no fim de cada mês <span class="sub">(itens com demanda recorrente e saldo zero ÷ itens com demanda recorrente)</span></h3>${rLinhaPct(S.map(s=>rMesLbl(s.ini)),S.map(s=>s.taxa==null?0:100*s.taxa),"Taxa de ruptura")}<div class="sub">Demanda recorrente = consumo em pelo menos 3 dos últimos 12 meses. Mede a frequência com que o saldo termina o mês zerado apesar de o item ser consumido com regularidade.</div></div>
-  <div class="rl-card"><h3>Maiores valores parados <span class="sub">(sem saída há ≥ 90 dias)</span></h3><div class="rl-tbl" style="max-height:330px"><table class="rl-t"><thead><tr><th>Almox.</th><th>Item</th><th class="n">Saldo</th><th class="n">Valor</th><th class="n">Dias s/ saída</th></tr></thead><tbody>${piores.map(c=>`<tr><td>${c.P.est==="central"?"Central":"Ceprocamp"}</td><td>${esc(c.P.cod)} ${esc(c.P.desc.slice(0,60))}</td><td class="n">${rN(c.saldo)}</td><td class="n">${rBRL(c.valor)}</td><td class="n">${c.semSaidaTodo?"≥ "+rN(cov(c)):rN(c.diasSem)}</td></tr>`).join("")||'<tr><td colspan="5" class="sub">Nenhum item.</td></tr>'}</tbody></table></div></div></div>`+rVencTab(V);
+  <div class="rl-card"><h3>Maiores valores parados <span class="sub">(sem saída há ≥ 90 dias)</span></h3><div class="rl-tbl" style="max-height:330px"><table class="rl-t"><thead><tr><th>Almox.</th><th>Item</th><th class="n">Saldo</th><th class="n">Valor</th><th class="n">Dias s/ saída</th></tr></thead><tbody>${piores.map(c=>`<tr><td>${c.P.est==="central"?"Central":"Ceprocamp"}</td><td>${esc(c.P.cod)} ${esc(c.P.desc.slice(0,60))}</td><td class="n">${rN(c.saldo)}</td><td class="n">${rBRL(c.valor)}</td><td class="n">${c.semSaidaTodo&&!c.vidaExata?"≥ ":""}${rN(c.diasSem)}</td></tr>`).join("")||'<tr><td colspan="5" class="sub">Nenhum item.</td></tr>'}</tbody></table></div></div></div>`+rVencTab(V);
 }
 function rLinhaPct(lb,v,nome){return rLinha(lb,v,nome).replace(/<text([^>]*class="rt">)([\d.,]+)( mil| mi)?<\/text>/g,(m,a,b,c)=>`<text${a}${b}${c||""}%</text>`)}
 function rAbaAlmox(X,per,J){
@@ -748,7 +752,7 @@ function rRender(){
     case"almox":h=rAbaAlmox(X,per,X.J);break;
     case"licit":h=rLicit(X);break;
     case"audit":h=rAudit(X);break;
-    case"itens":{const q=norm(RS.q);const vis=all.filter(c=>(!q||norm(c.P.cod+" "+c.P.desc).includes(q))&&(!RS.status||c.status===RS.status)&&(!RS.mx||(c.abcV+"|"+c.xyz)===RS.mx)&&(!RS.par||(c.saldo>0&&(c.semSaidaTodo?(per.ate-(REL.cov[c.P.est]||{ini:per.ini}).ini)/RDAY+1>=RS.par:c.diasSem>=RS.par))));h=rTabela(vis,per);break}
+    case"itens":{const q=norm(RS.q);const vis=all.filter(c=>(!q||norm(c.P.cod+" "+c.P.desc).includes(q))&&(!RS.status||c.status===RS.status)&&(!RS.mx||(c.abcV+"|"+c.xyz)===RS.mx)&&(!RS.par||(c.saldo>0&&c.diasSem>=RS.par)));h=rTabela(vis,per);break}
     default:h=rAbaGeral(X,A,V);
   }
   box.innerHTML=h;rX=X;
@@ -792,7 +796,7 @@ function rTabela(vis,per){
   const col=R_COLS.find(c=>c[0]===RS.sort)||R_COLS[4],cmp=(a,b)=>{const x=col[2](a),y=col[2](b);return(typeof x==="string"?x.localeCompare(y,"pt-BR"):x-y)*RS.dir};
   const L=[...vis].sort(cmp),show=L.slice(0,RS.shown);
   const th=R_COLS.map(c=>`<th data-s="${c[0]}" class="${["est","cod","desc","status","abc","xyz"].includes(c[0])?"":"n"}" style="cursor:pointer">${c[1]}${RS.sort===c[0]?(RS.dir>0?" ▲":" ▼"):""}</th>`).join("");
-  const tr=show.map(c=>{const st=R_ST[c.status];return`<tr><td>${c.P.est==="central"?"Central":"Ceprocamp"}</td><td>${esc(c.P.cod)}</td><td title="${esc(c.P.desc)}">${esc(c.P.desc)} <span class="sub">${esc(c.P.un)}</span></td><td class="n">${rN(c.saldo)}</td><td class="n">${rBRL(c.valor)}</td><td class="n">${rN(c.per.compraQ)}</td><td class="n">${rN(c.per.saiQ)}</td><td class="n">${rN(c.per.liqQ)}</td><td class="n">${rN(c.a12.mQ,1)}</td><td class="n">${rN(c.a3.mQ,1)}</td><td class="n">${rPct(c.var3)}</td><td class="n">${rA(c.aut12)}</td><td class="n">${rA(c.aut3)}</td><td class="n">${c.aRef==null?"—":rN(c.aRef*30.4375)}</td><td class="n">${c.semSaidaTodo?"≥ ":""}${rN(c.diasSem)}</td><td class="n">${c.ult==null?"—":rBr(c.ult)}</td><td>${c.abcV}</td><td>${c.xyz}</td><td><span class="rtag ${st[1]}">${st[0]}</span></td></tr>`}).join("");
+  const tr=show.map(c=>{const st=R_ST[c.status];return`<tr><td>${c.P.est==="central"?"Central":"Ceprocamp"}</td><td>${esc(c.P.cod)}</td><td title="${esc(c.P.desc)}">${esc(c.P.desc)} <span class="sub">${esc(c.P.un)}</span></td><td class="n">${rN(c.saldo)}</td><td class="n">${rBRL(c.valor)}</td><td class="n">${rN(c.per.compraQ)}</td><td class="n">${rN(c.per.saiQ)}</td><td class="n">${rN(c.per.liqQ)}</td><td class="n">${rN(c.a12.mQ,1)}</td><td class="n">${rN(c.a3.mQ,1)}</td><td class="n">${rPct(c.var3)}</td><td class="n">${rA(c.aut12)}</td><td class="n">${rA(c.aut3)}</td><td class="n">${c.aRef==null?"—":rN(c.aRef*30.4375)}</td><td class="n" title="${c.vidaExata?"No almoxarifado desde a 1ª compra em "+rBr(c.vidaIni):"Já havia saldo no início do histórico ("+rBr(c.vidaIni)+")"}">${c.semSaidaTodo&&!c.vidaExata?"≥ ":""}${rN(c.diasSem)}</td><td class="n">${c.ult==null?"—":rBr(c.ult)}</td><td>${c.abcV}</td><td>${c.xyz}</td><td><span class="rtag ${st[1]}">${st[0]}</span></td></tr>`}).join("");
   return`<div class="rl-card" id="rtab"><h3>Itens <span class="sub">${rN(vis.length)} item(ns)${RS.status?" — situação: <b>"+R_ST[RS.status][0]+"</b> <a href='#' id='rlimpa'>limpar</a>":""}${RS.mx?" — matriz ABC|XYZ: <b>"+RS.mx+"</b> <a href='#' id='rlimpa'>limpar</a>":""}${RS.par?" — sem saída há ≥ <b>"+RS.par+" dias</b> <a href='#' id='rlimpa'>limpar</a>":""} · período ${rBr(per.de)} a ${rBr(per.ate)} · médias em unidades/mês</span></h3><div class="rl-tbl"><table class="rl-t"><thead><tr>${th}</tr></thead><tbody>${tr||'<tr><td colspan="19" class="sub">Nenhum item.</td></tr>'}</tbody></table></div>${L.length>show.length?`<div style="text-align:center;margin-top:10px"><button id="rmais">Mostrar mais (${rN(L.length-show.length)} restantes)</button></div>`:""}</div>`;
 }
 

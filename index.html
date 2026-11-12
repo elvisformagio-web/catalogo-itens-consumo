@@ -187,6 +187,7 @@ header #home,header #logbtn,header #pvbtn{background:transparent;color:#fff;bord
 .rl-mx td.mx{text-align:center;cursor:pointer;min-width:110px}.rl-mx td.mx:hover,.rl-mx td.mx.on{outline:2px solid var(--pri)}.rl-mx td.mx b{font-size:18px}.rl-mx th{white-space:nowrap}
 .rtag{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
 .rtag.no{background:#fde2e2;color:#a11d1d}.rtag.ok{background:#dcf5e3;color:#17663a}.rtag.wn{background:#fff0d1;color:#8a5a00}.rtag.gr{background:var(--bg);color:var(--mut);border:1px solid var(--bd)}.rtag.in{background:#dbe8ff;color:#0b4a9a}
+.rl-click{cursor:pointer}.rl-click:hover td,.rl-click.on td{background:var(--bg)}.rl-click.on td{font-weight:700}
 @media print{body.rprint>*:not(#rel):not(script){display:none!important}body.rprint #rel .ab,body.rprint #rel .rl-bar,body.rprint #rel #rexp{display:none!important}body.rprint .rl-tbl{max-height:none;overflow:visible}body.rprint .rl-card,body.rprint .rl-k{break-inside:avoid}}
 </style>
 
@@ -321,7 +322,7 @@ SYSTEMS.enderecamento_bens={titulo:"Endereçamento de Bens Permanentes",est:SYST
 /* ================= Relatório de Consumo (dashboard) ================= */
 SYSTEMS.relatorio={titulo:"Relatório de Consumo",rel:true,est:[["central","Almoxarifado Central"],["ceprocamp","Almoxarifado Ceprocamp"]]};
 var REL=null,RLOAD=null; // dados carregados do banco
-const RS={aba:"geral",gran:"m",mx:"",licMeses:12,licMargem:10,est:"todos",preset:"12m",de:null,ate:null,q:"",status:"",sort:"valor",dir:-1,shown:100,top:"valor"};
+const RS={par:0,aba:"geral",gran:"m",mx:"",licMeses:12,licMargem:10,est:"todos",preset:"12m",de:null,ate:null,q:"",status:"",sort:"valor",dir:-1,shown:100,top:"valor"};
 const RDAY=864e5, RNOMEST={central:"Almoxarifado Central",ceprocamp:"Almoxarifado Ceprocamp"};
 const rIso=ms=>new Date(ms).toISOString().slice(0,10);
 const rMs=iso=>{const [y,m,d]=String(iso).slice(0,10).split("-").map(Number);return Date.UTC(y,m-1,d)};
@@ -678,10 +679,10 @@ function rAbaEstoque(X,A,V){
   const {per,all}=X,dias=per.ate-per.ini>=0?(per.ate-per.ini)/RDAY+1:0;
   const th=[90,180,365],cov=c=>(per.ate-(REL.cov[c.P.est]||{ini:per.ini}).ini)/RDAY+1;
   const rows=th.map(t=>{const L=all.filter(c=>c.saldo>0&&(c.semSaidaTodo?cov(c)>=t:c.diasSem>=t));const v=L.reduce((s,c)=>s+c.valor,0);
-    return{t,n:L.length,q:L.reduce((s,c)=>s+c.saldo,0),v,p:A.valor>0?v/A.valor:0,ok:dias>=t}});
+    return{t,L,n:L.length,q:L.reduce((s,c)=>s+c.saldo,0),v,p:A.valor>0?v/A.valor:0,ok:dias>=t}});
   const S=rSerie(all,per,"m");
   const piores=[...all].filter(c=>c.saldo>0&&(c.semSaidaTodo||c.diasSem>=90)).sort((a,b)=>b.valor-a.valor).slice(0,20);
-  return`<div class="rl-card"><h3>Obsolescência — estoque parado <span class="sub">(itens com saldo e sem saída — QT_SAÍDA = 0 — há 90, 180 ou 365 dias)</span></h3><div class="rl-tbl"><table class="rl-t"><thead><tr><th>Sem saída há</th><th class="n">Itens</th><th class="n">Unidades</th><th class="n">Valor imobilizado</th><th class="n">% do valor em estoque</th></tr></thead><tbody>${rows.map(r=>`<tr><td>≥ ${r.t} dias${r.ok?"":' <span class="sub">(histórico importado menor que isso)</span>'}</td><td class="n">${rN(r.n)}</td><td class="n">${rN(r.q)}</td><td class="n">${rBRL(r.v)}</td><td class="n">${rN(100*r.p,1)}%</td></tr>`).join("")}</tbody></table></div><div class="sub" style="margin-top:6px">Limitado ao histórico importado: item sem nenhuma saída no histórico conta como parado desde o início dos dados.</div></div>
+  return`<div class="rl-card"><h3>Obsolescência — estoque parado <span class="sub">(itens com saldo e sem saída — QT_SAÍDA = 0 — há 90, 180 ou 365 dias)</span></h3><div class="rl-tbl"><table class="rl-t"><thead><tr><th>Sem saída há</th><th class="n">Itens</th><th class="n">Unidades</th><th class="n">Valor imobilizado</th><th class="n">% do valor em estoque</th></tr></thead><tbody>${rows.map(r=>`<tr data-par="${r.t}" class="rl-click" title="Clique para listar os itens na aba Itens"><td>≥ ${r.t} dias${r.ok?"":' <span class="sub">(histórico importado menor que isso)</span>'}</td><td class="n">${rN(r.n)}</td><td class="n">${rN(r.q)}</td><td class="n">${rBRL(r.v)}</td><td class="n">${rN(100*r.p,1)}%</td></tr>`).join("")}</tbody></table></div><div class="sub" style="margin-top:6px">Clique numa linha para ver os itens na aba “Itens”. Limitado ao histórico importado: item sem nenhuma saída no histórico conta como parado desde o início dos dados.</div></div>
   <div class="rl-grid2"><div class="rl-card"><h3>Taxa de ruptura no fim de cada mês <span class="sub">(itens com demanda recorrente e saldo zero ÷ itens com demanda recorrente)</span></h3>${rLinhaPct(S.map(s=>rMesLbl(s.ini)),S.map(s=>s.taxa==null?0:100*s.taxa),"Taxa de ruptura")}<div class="sub">Demanda recorrente = consumo em pelo menos 3 dos últimos 12 meses. Mede a frequência com que o saldo termina o mês zerado apesar de o item ser consumido com regularidade.</div></div>
   <div class="rl-card"><h3>Maiores valores parados <span class="sub">(sem saída há ≥ 90 dias)</span></h3><div class="rl-tbl" style="max-height:330px"><table class="rl-t"><thead><tr><th>Almox.</th><th>Item</th><th class="n">Saldo</th><th class="n">Valor</th><th class="n">Dias s/ saída</th></tr></thead><tbody>${piores.map(c=>`<tr><td>${c.P.est==="central"?"Central":"Ceprocamp"}</td><td>${esc(c.P.cod)} ${esc(c.P.desc.slice(0,60))}</td><td class="n">${rN(c.saldo)}</td><td class="n">${rBRL(c.valor)}</td><td class="n">${c.semSaidaTodo?"≥ "+rN(cov(c)):rN(c.diasSem)}</td></tr>`).join("")||'<tr><td colspan="5" class="sub">Nenhum item.</td></tr>'}</tbody></table></div></div></div>`+rVencTab(V);
 }
@@ -747,7 +748,7 @@ function rRender(){
     case"almox":h=rAbaAlmox(X,per,X.J);break;
     case"licit":h=rLicit(X);break;
     case"audit":h=rAudit(X);break;
-    case"itens":{const q=norm(RS.q);const vis=all.filter(c=>(!q||norm(c.P.cod+" "+c.P.desc).includes(q))&&(!RS.status||c.status===RS.status)&&(!RS.mx||(c.abcV+"|"+c.xyz)===RS.mx));h=rTabela(vis,per);break}
+    case"itens":{const q=norm(RS.q);const vis=all.filter(c=>(!q||norm(c.P.cod+" "+c.P.desc).includes(q))&&(!RS.status||c.status===RS.status)&&(!RS.mx||(c.abcV+"|"+c.xyz)===RS.mx)&&(!RS.par||(c.saldo>0&&(c.semSaidaTodo?(per.ate-(REL.cov[c.P.est]||{ini:per.ini}).ini)/RDAY+1>=RS.par:c.diasSem>=RS.par))));h=rTabela(vis,per);break}
     default:h=rAbaGeral(X,A,V);
   }
   box.innerHTML=h;rX=X;
@@ -792,7 +793,7 @@ function rTabela(vis,per){
   const L=[...vis].sort(cmp),show=L.slice(0,RS.shown);
   const th=R_COLS.map(c=>`<th data-s="${c[0]}" class="${["est","cod","desc","status","abc","xyz"].includes(c[0])?"":"n"}" style="cursor:pointer">${c[1]}${RS.sort===c[0]?(RS.dir>0?" ▲":" ▼"):""}</th>`).join("");
   const tr=show.map(c=>{const st=R_ST[c.status];return`<tr><td>${c.P.est==="central"?"Central":"Ceprocamp"}</td><td>${esc(c.P.cod)}</td><td title="${esc(c.P.desc)}">${esc(c.P.desc)} <span class="sub">${esc(c.P.un)}</span></td><td class="n">${rN(c.saldo)}</td><td class="n">${rBRL(c.valor)}</td><td class="n">${rN(c.per.compraQ)}</td><td class="n">${rN(c.per.saiQ)}</td><td class="n">${rN(c.per.liqQ)}</td><td class="n">${rN(c.a12.mQ,1)}</td><td class="n">${rN(c.a3.mQ,1)}</td><td class="n">${rPct(c.var3)}</td><td class="n">${rA(c.aut12)}</td><td class="n">${rA(c.aut3)}</td><td class="n">${c.aRef==null?"—":rN(c.aRef*30.4375)}</td><td class="n">${c.semSaidaTodo?"≥ ":""}${rN(c.diasSem)}</td><td>${c.abcV}</td><td>${c.xyz}</td><td><span class="rtag ${st[1]}">${st[0]}</span></td></tr>`}).join("");
-  return`<div class="rl-card" id="rtab"><h3>Itens <span class="sub">${rN(vis.length)} item(ns)${RS.status?" — situação: <b>"+R_ST[RS.status][0]+"</b> <a href='#' id='rlimpa'>limpar</a>":""}${RS.mx?" — matriz ABC|XYZ: <b>"+RS.mx+"</b> <a href='#' id='rlimpa'>limpar</a>":""} · período ${rBr(per.de)} a ${rBr(per.ate)} · médias em unidades/mês</span></h3><div class="rl-tbl"><table class="rl-t"><thead><tr>${th}</tr></thead><tbody>${tr||'<tr><td colspan="18" class="sub">Nenhum item.</td></tr>'}</tbody></table></div>${L.length>show.length?`<div style="text-align:center;margin-top:10px"><button id="rmais">Mostrar mais (${rN(L.length-show.length)} restantes)</button></div>`:""}</div>`;
+  return`<div class="rl-card" id="rtab"><h3>Itens <span class="sub">${rN(vis.length)} item(ns)${RS.status?" — situação: <b>"+R_ST[RS.status][0]+"</b> <a href='#' id='rlimpa'>limpar</a>":""}${RS.mx?" — matriz ABC|XYZ: <b>"+RS.mx+"</b> <a href='#' id='rlimpa'>limpar</a>":""}${RS.par?" — sem saída há ≥ <b>"+RS.par+" dias</b> <a href='#' id='rlimpa'>limpar</a>":""} · período ${rBr(per.de)} a ${rBr(per.ate)} · médias em unidades/mês</span></h3><div class="rl-tbl"><table class="rl-t"><thead><tr>${th}</tr></thead><tbody>${tr||'<tr><td colspan="18" class="sub">Nenhum item.</td></tr>'}</tbody></table></div>${L.length>show.length?`<div style="text-align:center;margin-top:10px"><button id="rmais">Mostrar mais (${rN(L.length-show.length)} restantes)</button></div>`:""}</div>`;
 }
 
 /* ---------- importação do consumo ---------- */
@@ -896,12 +897,13 @@ async function relEnter(force){
   rEl("rde").onchange=dd;rEl("rate").onchange=dd;
   rEl("rq").oninput=e=>{RS.q=e.target.value;RS.shown=100;clearTimeout(rEl.h);rEl.h=setTimeout(()=>{if(REL){rRender();const i=rEl("rq");i.focus();i.setSelectionRange(i.value.length,i.value.length)}},250)};
   rEl("rbody").addEventListener("click",e=>{
+    const pr=e.target.closest("tr[data-par]");if(pr){RS.par=+pr.dataset.par;RS.status="";RS.mx="";RS.aba="itens";RS.shown=100;window.scrollTo(0,0);rRender();return}
     const tb=e.target.closest("button[data-a]");if(tb){RS.aba=tb.dataset.a;window.scrollTo(0,0);rRender();return}
     const mx=e.target.closest("[data-mx]");if(mx){RS.mx=RS.mx===mx.dataset.mx?"":mx.dataset.mx;RS.aba="itens";RS.shown=100;rRender();return}
     const st=e.target.closest("[data-st]");if(st&&st.dataset.st){RS.status=RS.status===st.dataset.st?"":st.dataset.st;RS.aba="itens";RS.shown=100;rRender();window.scrollTo(0,0);return}
     const th=e.target.closest("th[data-s]");if(th){const s=th.dataset.s;if(RS.sort===s)RS.dir*=-1;else{RS.sort=s;RS.dir=["est","cod","desc","status","abc","xyz"].includes(s)?1:-1}rRender();return}
     if(e.target.id==="rmais"){RS.shown+=200;rRender();return}
-    if(e.target.id==="rlimpa"){e.preventDefault();RS.status="";RS.mx="";rRender()}
+    if(e.target.id==="rlimpa"){e.preventDefault();RS.status="";RS.mx="";RS.par=0;rRender()}
   });
 })();
 

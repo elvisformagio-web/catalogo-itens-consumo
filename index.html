@@ -188,6 +188,7 @@ header #home,header #logbtn,header #pvbtn{background:transparent;color:#fff;bord
 .rtag{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
 .rtag.no{background:#fde2e2;color:#a11d1d}.rtag.ok{background:#dcf5e3;color:#17663a}.rtag.wn{background:#fff0d1;color:#8a5a00}.rtag.gr{background:var(--bg);color:var(--mut);border:1px solid var(--bd)}.rtag.in{background:#dbe8ff;color:#0b4a9a}
 .rl-click{cursor:pointer}.rl-click:hover td,.rl-click.on td{background:var(--bg)}.rl-click.on td{font-weight:700}
+.rl-topscroll{overflow-x:auto;overflow-y:hidden;height:16px;margin-bottom:4px}.rl-topscroll>div{height:1px}
 @media print{body.rprint>*:not(#rel):not(script){display:none!important}body.rprint #rel .ab,body.rprint #rel .rl-bar,body.rprint #rel #rexp{display:none!important}body.rprint .rl-tbl{max-height:none;overflow:visible}body.rprint .rl-card,body.rprint .rl-k{break-inside:avoid}}
 </style>
 
@@ -756,6 +757,10 @@ function rRender(){
     default:h=rAbaGeral(X,A,V);
   }
   box.innerHTML=h;rX=X;
+  const tp=rEl("rtop"),tb=rEl("rtbl");
+  if(tp&&tb){const ajusta=()=>{tp.firstChild.style.width=tb.scrollWidth+"px";tp.style.display=tb.scrollWidth>tb.clientWidth+2?"":"none"};ajusta();
+    let a=false;tp.onscroll=()=>{if(a){a=false;return}a=true;tb.scrollLeft=tp.scrollLeft};tb.onscroll=()=>{if(a){a=false;return}a=true;tp.scrollLeft=tb.scrollLeft};
+    window.onresize=ajusta}
   const g=rEl("rgran");if(g)g.onchange=e=>{RS.gran=e.target.value;rRender()};
   const lm=rEl("rlm");if(lm){lm.onchange=e=>{RS.licMeses=+e.target.value;rRender()};rEl("rlg").onchange=e=>{RS.licMargem=+e.target.value;rRender()};rEl("rlcsv").onclick=rCsvLicit}
 }
@@ -797,7 +802,7 @@ function rTabela(vis,per){
   const L=[...vis].sort(cmp),show=L.slice(0,RS.shown);
   const th=R_COLS.map(c=>`<th data-s="${c[0]}" class="${["est","cod","desc","status","abc","xyz"].includes(c[0])?"":"n"}" style="cursor:pointer">${c[1]}${RS.sort===c[0]?(RS.dir>0?" ▲":" ▼"):""}</th>`).join("");
   const tr=show.map(c=>{const st=R_ST[c.status];return`<tr><td>${c.P.est==="central"?"Central":"Ceprocamp"}</td><td>${esc(c.P.cod)}</td><td title="${esc(c.P.desc)}">${esc(c.P.desc)} <span class="sub">${esc(c.P.un)}</span></td><td class="n">${rN(c.saldo)}</td><td class="n">${rBRL(c.valor)}</td><td class="n">${rN(c.per.compraQ)}</td><td class="n">${rN(c.per.saiQ)}</td><td class="n">${rN(c.per.liqQ)}</td><td class="n">${rN(c.a12.mQ,1)}</td><td class="n">${rN(c.a3.mQ,1)}</td><td class="n">${rPct(c.var3)}</td><td class="n">${rA(c.aut12)}</td><td class="n">${rA(c.aut3)}</td><td class="n">${c.aRef==null?"—":rN(c.aRef*30.4375)}</td><td class="n" title="${c.vidaExata?"No almoxarifado desde a 1ª compra em "+rBr(c.vidaIni):"Já havia saldo no início do histórico ("+rBr(c.vidaIni)+")"}">${c.semSaidaTodo&&!c.vidaExata?"≥ ":""}${rN(c.diasSem)}</td><td class="n">${c.ult==null?"—":rBr(c.ult)}</td><td>${c.abcV}</td><td>${c.xyz}</td><td><span class="rtag ${st[1]}">${st[0]}</span></td></tr>`}).join("");
-  return`<div class="rl-card" id="rtab"><h3>Itens <span class="sub">${rN(vis.length)} item(ns)${RS.status?" — situação: <b>"+R_ST[RS.status][0]+"</b> <a href='#' id='rlimpa'>limpar</a>":""}${RS.mx?" — matriz ABC|XYZ: <b>"+RS.mx+"</b> <a href='#' id='rlimpa'>limpar</a>":""}${RS.par?" — sem saída há ≥ <b>"+RS.par+" dias</b> <a href='#' id='rlimpa'>limpar</a>":""} · período ${rBr(per.de)} a ${rBr(per.ate)} · médias em unidades/mês</span></h3><div class="rl-tbl"><table class="rl-t"><thead><tr>${th}</tr></thead><tbody>${tr||'<tr><td colspan="19" class="sub">Nenhum item.</td></tr>'}</tbody></table></div>${L.length>show.length?`<div style="text-align:center;margin-top:10px"><button id="rmais">Mostrar mais (${rN(L.length-show.length)} restantes)</button></div>`:""}</div>`;
+  return`<div class="rl-card" id="rtab"><h3>Itens <span class="sub">${rN(vis.length)} item(ns)${RS.status?" — situação: <b>"+R_ST[RS.status][0]+"</b> <a href='#' id='rlimpa'>limpar</a>":""}${RS.mx?" — matriz ABC|XYZ: <b>"+RS.mx+"</b> <a href='#' id='rlimpa'>limpar</a>":""}${RS.par?" — sem saída há ≥ <b>"+RS.par+" dias</b> <a href='#' id='rlimpa'>limpar</a>":""} · período ${rBr(per.de)} a ${rBr(per.ate)} · médias em unidades/mês</span></h3><div class="rl-topscroll" id="rtop" title="Role para os lados"><div></div></div><div class="rl-tbl" id="rtbl"><table class="rl-t"><thead><tr>${th}</tr></thead><tbody>${tr||'<tr><td colspan="19" class="sub">Nenhum item.</td></tr>'}</tbody></table></div>${L.length>show.length?`<div style="text-align:center;margin-top:10px"><button id="rmais">Mostrar mais (${rN(L.length-show.length)} restantes)</button></div>`:""}</div>`;
 }
 
 /* ---------- importação do consumo ---------- */

@@ -939,7 +939,7 @@ const SUPER="elvis.formagio@educa.fumec.sp.gov.br"; // único usuário que geren
 let gestor=false; // administrador autorizado pelo principal a gerenciar acessos
 const isPrincipal=()=>realAdmin&&userEmail===SUPER;
 const isSuper=()=>isPrincipal()||(realAdmin&&gestor);
-const podeSys=k=>permErr?true:(realAdmin||myPerm.has(k));
+const podeSys=k=>permErr?true:(realAdmin?(isPrincipal()||!myBlock.has(k)):myPerm.has(k));
 function aplicarPortal(){
   $("#padm").textContent=(userEmail?userEmail+(realAdmin?" (admin)":"")+" · ":"")+"Sair";
   let n=0;document.querySelectorAll("#portal .tile[data-go]").forEach(t=>{const ok=podeSys(t.dataset.go);t.style.display=ok?"":"none";if(ok)n++});
@@ -961,7 +961,7 @@ function fromHash(){const h=(location.hash||"").replace(/^#\/?/,"");cur=SYSTEMS[
 window.addEventListener("hashchange",fromHash);
 document.addEventListener("click",e=>{const t=e.target.closest("[data-go]");if(t){e.preventDefault();go(t.dataset.go)}});
 const filtSet=new Set();
-let myPerm=new Set(),permErr=null;
+let myPerm=new Set(),myBlock=new Set(),permErr=null;
 let ends=[],endMap=new Map(),endErr=null,ivId=null,items=[],imps={},est="central",admin=false,realAdmin=false,preview=false,filt="todos",term="",editId=null,delId=null,editMode="",imgId=null,relat=null;
 function toast(m,ms=4500){const t=$("#toast");t.textContent=m;t.style.display="block";clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.display="none",ms)}
 const ph=n=>"data:image/svg+xml;utf8,"+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><rect width="400" height="300" fill="#c9ced6"/><text x="200" y="175" font-size="90" text-anchor="middle" fill="#8a919c" font-family="sans-serif">${esc((n||"?").trim()[0]||"?").toUpperCase()}</text></svg>`);
@@ -1012,10 +1012,11 @@ const DOM="educa.fumec.sp.gov.br";
 let userEmail="",started=false;
 function gate(msg,btn){$("#gate").style.display="flex";$("#gmsg").textContent=msg||"";$("#glogin").style.display=btn?"flex":"none"}
 async function loadPerm(email){
-  myPerm=new Set();permErr=null;gestor=false;
+  myPerm=new Set();myBlock=new Set();permErr=null;gestor=false;
   try{const {data,error}=await sb.from("acesso_sistemas").select("sistema").eq("email",email);if(error)throw error;(data||[]).forEach(r=>myPerm.add(r.sistema))}
   catch(e){permErr=e}
   try{const {data}=await sb.from("gestores_acesso").select("email").eq("email",email);gestor=!!(data&&data.length)}catch(e){gestor=false}
+  try{const {data}=await sb.from("admin_bloqueios").select("sistema").eq("email",email);(data||[]).forEach(r=>myBlock.add(r.sistema))}catch(e){myBlock=new Set()}
   //  tabela ainda não criada: mantém o acesso liberado até rodar o SQL da seção 12
 }
 function registrarUsuario(email){try{sb.from("usuarios").upsert({email,ultimo_acesso:new Date().toISOString()},{onConflict:"email"}).then(()=>{},()=>{})}catch(e){}}
@@ -1277,7 +1278,7 @@ async function registrarAcao(acao,detalhe,cat){
   return error||null;
 }
 let alRows=[],alResumo=false;
-const ACAON={importacao_consumo:"📊 Importou consumo (relatório)",importacao_validades:"📅 Importou validades (relatório)",apagar_todos:"⚠ Apagou todos os itens",limpar_log:"🧹 Limpou o histórico do log",
+const ACAON={acesso_admin:"🔐 Alterou acesso de administrador",importacao_consumo:"📊 Importou consumo (relatório)",importacao_validades:"📅 Importou validades (relatório)",apagar_todos:"⚠ Apagou todos os itens",limpar_log:"🧹 Limpou o histórico do log",
   item_ativado:"✅ Ativou item",item_desativado:"⛔ Desativou item",item_editado:"✏️ Editou item",item_quantidade:"🔢 Alterou quantidade",item_indisponivel:"🚫 Marcou item como indisponível",item_imagem:"🖼 Alterou imagem do item",item_excluido:"🗑 Excluiu item",
   importacao_planilha:"⬆ Importou planilha",importacao_imagens:"🖼 Importou imagens",importacao_enderecos:"📍 Importou endereços",
   endereco_editado:"📍 Editou endereços do item",endereco_incluido:"📍 Incluiu endereço",endereco_removido:"📍 Removeu endereço"};
@@ -1317,11 +1318,12 @@ function alRender(){
 }
 /* ---------- Acessos de usuários ---------- */
 const SIST=[["consumo","Catálogo de Consumo"],["permanentes","Catálogo de Bens"],["enderecamento","Endereç. Consumo"],["enderecamento_bens","Endereç. Bens"],["relatorio","Relatório de Consumo"]];
-let uaUsers=new Map(),uaAdmins=new Set(),uaGest=new Set();
+let uaUsers=new Map(),uaAdmins=new Set(),uaGest=new Set(),uaBlk=new Map();
 async function uaCarregar(){
   const pag=async(t,cols)=>{let o=[];for(let a=0;;a+=1000){const {data,error}=await sb.from(t).select(cols).range(a,a+999);if(error)throw error;o=o.concat(data||[]);if(!data||data.length<1000)break}return o};
   const [us,pm,ad]=await Promise.all([pag("usuarios","email,ultimo_acesso"),pag("acesso_sistemas","email,sistema"),pag("admins","email")]);
   try{uaGest=new Set((await pag("gestores_acesso","email")).map(g=>String(g.email).toLowerCase()))}catch(e){uaGest=new Set()}
+  uaBlk=new Map();try{(await pag("admin_bloqueios","email,sistema")).forEach(r=>{const e=String(r.email).toLowerCase();if(!uaBlk.has(e))uaBlk.set(e,new Set());uaBlk.get(e).add(r.sistema)})}catch(e){uaBlk=new Map()}
   uaUsers=new Map();uaAdmins=new Set(ad.map(a=>String(a.email).toLowerCase()));
   const get=e=>{e=String(e).toLowerCase();if(!uaUsers.has(e))uaUsers.set(e,{email:e,ult:null,perm:new Set()});return uaUsers.get(e)};
   us.forEach(u=>{get(u.email).ult=u.ultimo_acesso});pm.forEach(r=>get(r.email).perm.add(r.sistema));uaAdmins.forEach(e=>get(e));
@@ -1329,7 +1331,7 @@ async function uaCarregar(){
 function uaRender(){
   const q=$("#uaq").value.trim().toLowerCase();
   const l=[...uaUsers.values()].filter(u=>!q||u.email.includes(q)).sort((a,b)=>a.email.localeCompare(b.email));
-  $("#uab").innerHTML=l.length?`<table class="lg2"><thead><tr><th>Usuário</th>${SIST.map(x=>`<th style="text-align:center">${esc(x[1])}</th>`).join("")}<th style="text-align:center">Gerencia acessos</th><th></th></tr></thead><tbody>${l.map(u=>{const adm=uaAdmins.has(u.email);return `<tr data-e="${esc(u.email)}"><td>${esc(u.email)}${adm?' <b style="color:var(--pri)">(admin)</b>':""}<br><span class="sub">${u.ult?"Último acesso: "+esc(fdh(u.ult)):"Nunca acessou"}</span></td>${SIST.map(x=>`<td style="text-align:center"><input type="checkbox" data-k="${x[0]}" ${adm||u.perm.has(x[0])?"checked":""} ${adm?"disabled":""}></td>`).join("")}<td style="text-align:center">${u.email===SUPER?'<input type="checkbox" checked disabled title="Administrador principal">':adm?`<input type="checkbox" data-g="1" ${uaGest.has(u.email)?"checked":""} ${isPrincipal()?"":"disabled"} title="${isPrincipal()?"Permite que este administrador gerencie os acessos":"Somente o administrador principal altera"}">`:'<span class="sub" title="Só administradores podem receber esta permissão">—</span>'}</td><td style="white-space:nowrap">${adm?"":'<button data-all="1">Todos</button> <button data-all="0">Nenhum</button>'}</td></tr>`}).join("")}</tbody></table>`:'<div class="empty">Nenhum usuário encontrado.</div>';
+  $("#uab").innerHTML=l.length?`<table class="lg2"><thead><tr><th>Usuário</th>${SIST.map(x=>`<th style="text-align:center">${esc(x[1])}</th>`).join("")}<th style="text-align:center">Gerencia acessos</th><th></th></tr></thead><tbody>${l.map(u=>{const adm=uaAdmins.has(u.email);return `<tr data-e="${esc(u.email)}"><td>${esc(u.email)}${adm?' <b style="color:var(--pri)">(admin)</b>':""}<br><span class="sub">${u.ult?"Último acesso: "+esc(fdh(u.ult)):"Nunca acessou"}</span></td>${SIST.map(x=>`<td style="text-align:center">${adm?`<input type="checkbox" data-b="${x[0]}" ${(uaBlk.get(u.email)||new Set()).has(x[0])?"":"checked"} ${isPrincipal()&&u.email!==SUPER?"":"disabled"} title="${u.email===SUPER?"Administrador principal: acesso total":isPrincipal()?"Libera/bloqueia este sistema para o administrador":"Somente o administrador principal altera"}">`:`<input type="checkbox" data-k="${x[0]}" ${u.perm.has(x[0])?"checked":""}>`}</td>`).join("")}<td style="text-align:center">${u.email===SUPER?'<input type="checkbox" checked disabled title="Administrador principal">':adm?`<input type="checkbox" data-g="1" ${uaGest.has(u.email)?"checked":""} ${isPrincipal()?"":"disabled"} title="${isPrincipal()?"Permite que este administrador gerencie os acessos":"Somente o administrador principal altera"}">`:'<span class="sub" title="Só administradores podem receber esta permissão">—</span>'}</td><td style="white-space:nowrap">${adm&&!(isPrincipal()&&u.email!==SUPER)?"":'<button data-all="1">Todos</button> <button data-all="0">Nenhum</button>'}</td></tr>`}).join("")}</tbody></table>`:'<div class="empty">Nenhum usuário encontrado.</div>';
   const sem=[...uaUsers.values()].filter(u=>!uaAdmins.has(u.email)&&!u.perm.size).length;
   $("#uac").textContent=`${uaUsers.size} usuário(s)${sem?` · ${sem} sem nenhum sistema liberado`:""}`;
 }
@@ -1358,6 +1360,14 @@ $("#uab").addEventListener("change",async e=>{
       toast(g.checked?"Permissão concedida: este administrador agora gerencia os acessos.":"Permissão removida.",6000);
     }catch(x){g.checked=!g.checked;toast("Não foi possível salvar: "+(x.message||x.code||x)+" (rode a seção 15 do SQL)",10000)}
     return}
+  const bb=e.target.closest("input[data-b]");
+  if(bb){const em=bb.closest("tr").dataset.e,k=bb.dataset.b;if(!isPrincipal()||em===SUPER){bb.checked=!bb.checked;return}
+    try{
+      if(!bb.checked){const {error}=await sb.from("admin_bloqueios").upsert({email:em,sistema:k},{onConflict:"email,sistema"});if(error)throw error;if(!uaBlk.has(em))uaBlk.set(em,new Set());uaBlk.get(em).add(k)}
+      else{const {error}=await sb.from("admin_bloqueios").delete().eq("email",em).eq("sistema",k);if(error)throw error;if(uaBlk.has(em))uaBlk.get(em).delete(k)}
+      try{logAlt("acesso_admin",`${em}: ${bb.checked?"liberou":"bloqueou"} ${k}`)}catch(_){}
+    }catch(x){bb.checked=!bb.checked;toast("Não foi possível salvar: "+(x.message||x.code||x)+" (rode a seção 20 do SQL)",10000)}
+    return}
   const c=e.target.closest("input[data-k]");if(!c)return;const tr=c.closest("tr"),em=tr.dataset.e,k=c.dataset.k,u=uaUsers.get(em);
   try{
     if(c.checked){const {error}=await sb.from("acesso_sistemas").upsert({email:em,sistema:k},{onConflict:"email,sistema"});if(error)throw error;u.perm.add(k)}
@@ -1367,6 +1377,15 @@ $("#uab").addEventListener("change",async e=>{
 });
 $("#uab").addEventListener("click",async e=>{
   const b=e.target.closest("button[data-all]");if(!b)return;const em=b.closest("tr").dataset.e,u=uaUsers.get(em),todos=b.dataset.all==="1";
+  if(uaAdmins.has(em)){
+    if(!isPrincipal()||em===SUPER)return;
+    try{
+      if(todos){const {error}=await sb.from("admin_bloqueios").delete().eq("email",em);if(error)throw error;uaBlk.delete(em)}
+      else{const {error}=await sb.from("admin_bloqueios").upsert(SIST.map(x=>({email:em,sistema:x[0]})),{onConflict:"email,sistema"});if(error)throw error;uaBlk.set(em,new Set(SIST.map(x=>x[0])))}
+      try{logAlt("acesso_admin",`${em}: ${todos?"liberou todos":"bloqueou todos"} os sistemas`)}catch(_){}
+      uaRender();
+    }catch(x){toast("Não foi possível salvar: "+(x.message||x.code||x)+" (rode a seção 20 do SQL)",10000)}
+    return}
   try{
     if(todos){const {error}=await sb.from("acesso_sistemas").upsert(SIST.map(x=>({email:em,sistema:x[0]})),{onConflict:"email,sistema"});if(error)throw error;SIST.forEach(x=>u.perm.add(x[0]))}
     else{const {error}=await sb.from("acesso_sistemas").delete().eq("email",em);if(error)throw error;u.perm.clear()}

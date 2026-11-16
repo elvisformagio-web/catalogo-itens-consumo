@@ -210,6 +210,7 @@ header #home,header #logbtn,header #pvbtn{background:transparent;color:#fff;bord
 <div id="pvbar">👁 Você está vendo o sistema como um usuário comum. <button id="pvback">Voltar ao modo administrador</button></div>
 <div id="portal"><div class="wrap">
 <header><div class="lg"><img id="plogo" alt="FUMEC"><div><h1>Sistemas do Almoxarifado</h1><div class="sub">FUMEC · Fundação Municipal para Educação Comunitária</div></div></div><div class="ab"><button id="padm">Sair</button></div></header>
+<div id="bkaviso" style="display:none;margin:14px 0 0;padding:11px 14px;border:1px solid #e0a100;background:#fff6dc;color:#5a4200;border-radius:10px;cursor:pointer;font-size:14px"></div>
 <div class="tg" style="margin-top:16px">
   <a class="tile t1" href="#/consumo" data-go="consumo"><span class="ic"><svg viewBox="0 0 24 24"><path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/></svg></span>Catálogo de Itens de Consumo</a>
   <a class="tile t2" href="#/permanentes" data-go="permanentes"><span class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M8 20h8M12 16v4"/></svg></span>Catálogo de Bens Permanentes</a>
@@ -217,6 +218,7 @@ header #home,header #logbtn,header #pvbtn{background:transparent;color:#fff;bord
   <a class="tile t4" href="#/enderecamento_bens" data-go="enderecamento_bens"><span class="ic"><svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V3M19 21V3M5 8h14M5 14h14"/><rect x="7" y="4" width="4" height="3.5"/><rect x="13" y="9.5" width="4" height="3.5"/><rect x="7.5" y="16" width="5" height="4"/></svg></span>Endereçamento de Bens Permanentes</a>
   <a class="tile t6" href="#/relatorio" data-go="relatorio"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span>Relatório de Consumo</a>
   <a class="tile t5" id="tileacc" href="#" style="display:none"><span class="ic"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 5.5a3 3 0 0 1 0 5.8M18 14.3c1.8.8 3 2.6 3 4.7"/></svg></span>Acessos de usuários</a>
+  <a class="tile t5" id="tilebkp" href="#" style="display:none"><span class="ic"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v3h16v-3"/></svg></span>Backup do sistema</a>
 </div>
 <div id="nop" style="display:none;margin:18px 4px;padding:14px 16px;border:1px solid var(--bd);border-radius:10px;background:var(--card)">Você ainda não tem acesso a nenhum sistema. Peça a um administrador para liberar o seu acesso e depois atualize a página.</div></div></div>
 <div id="rel" style="display:none"><div class="wrap">
@@ -279,6 +281,21 @@ header #home,header #logbtn,header #pvbtn{background:transparent;color:#fff;bord
   <div style="display:flex;gap:8px;flex-wrap:wrap"><input id="uaq" type="search" placeholder="Filtrar por e-mail…" style="flex:1;min-width:160px"><input id="uan" type="email" placeholder="novo.usuario@educa.fumec.sp.gov.br" style="flex:1.3;min-width:220px"><button id="uaadd">Adicionar usuário</button></div>
   <div id="uab" style="overflow:auto"></div>
   <div class="row"><span id="uac" class="sub" style="margin-right:auto"></span><button id="uaf" class="pri">Fechar</button></div></div></div>
+<div class="ovl" id="bk"><div class="mod" style="max-width:620px;max-height:90vh;overflow:auto">
+  <b>Backup do sistema</b>
+  <div class="sub">Gera um arquivo .zip com todos os dados (JSON e CSV para Excel), as imagens, uma cópia do sistema, uma consulta offline e o passo a passo para voltar ao ar caso a Vercel ou o Supabase sejam bloqueados. Guarde o arquivo fora da nuvem do sistema (HD externo, e-mail institucional, outro serviço).</div>
+  <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="bkimg" checked style="width:auto"> Incluir imagens dos itens (arquivo maior)</label>
+  <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="bklog" checked style="width:auto"> Incluir log de acessos</label>
+  <div><button class="pri" id="bkgo">⬇ Gerar e baixar backup</button></div>
+  <div class="sub" id="bkult"></div>
+  <hr style="border:0;border-top:1px solid var(--bd);width:100%">
+  <b style="font-size:14px">Restaurar a partir de um backup</b>
+  <div class="sub">Use em um projeto Supabase novo (depois de rodar o SQL) ou para recuperar dados. Mescla com o que existe: sobrescreve registros de mesma chave e não apaga nada.</div>
+  <input type="file" id="bkfile" accept=".zip">
+  <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="bkrimg" style="width:auto"> Reenviar imagens ao Storage (use ao restaurar em outro Supabase)</label>
+  <div><button class="dng" id="bkrest">♻ Restaurar backup</button></div>
+  <div class="sub" id="bkst" style="white-space:pre-wrap"></div>
+  <div class="row"><button id="bkx" class="pri">Fechar</button></div></div></div>
 <div class="ovl" id="ae"><div class="mod">
   <b id="aet">Endereços do item</b><div id="aen" class="sub"></div>
   <div id="aelist" style="display:grid;gap:8px;max-height:50vh;overflow:auto"></div>
@@ -944,6 +961,7 @@ function aplicarPortal(){
   $("#padm").textContent=(userEmail?userEmail+(realAdmin?" (admin)":"")+" · ":"")+"Sair";
   let n=0;document.querySelectorAll("#portal .tile[data-go]").forEach(t=>{const ok=podeSys(t.dataset.go);t.style.display=ok?"":"none";if(ok)n++});
   $("#tileacc").style.display=isSuper()&&!preview&&!permErr?"":"none";
+  $("#tilebkp").style.display=isPrincipal()&&!preview&&!permErr?"":"none";bkAviso();
   $("#nop").style.display=userEmail&&!realAdmin&&!n?"block":"none";
 }
 function apply(){
@@ -1278,7 +1296,7 @@ async function registrarAcao(acao,detalhe,cat){
   return error||null;
 }
 let alRows=[],alResumo=false;
-const ACAON={acesso_admin:"🔐 Alterou acesso de administrador",importacao_consumo:"📊 Importou consumo (relatório)",importacao_validades:"📅 Importou validades (relatório)",apagar_todos:"⚠ Apagou todos os itens",limpar_log:"🧹 Limpou o histórico do log",
+const ACAON={backup_sistema:"💾 Gerou backup do sistema",backup_restaurado:"♻ Restaurou backup",acesso_admin:"🔐 Alterou acesso de administrador",importacao_consumo:"📊 Importou consumo (relatório)",importacao_validades:"📅 Importou validades (relatório)",apagar_todos:"⚠ Apagou todos os itens",limpar_log:"🧹 Limpou o histórico do log",
   item_ativado:"✅ Ativou item",item_desativado:"⛔ Desativou item",item_editado:"✏️ Editou item",item_quantidade:"🔢 Alterou quantidade",item_indisponivel:"🚫 Marcou item como indisponível",item_imagem:"🖼 Alterou imagem do item",item_excluido:"🗑 Excluiu item",
   importacao_planilha:"⬆ Importou planilha",importacao_imagens:"🖼 Importou imagens",importacao_enderecos:"📍 Importou endereços",
   endereco_editado:"📍 Editou endereços do item",endereco_incluido:"📍 Incluiu endereço",endereco_removido:"📍 Removeu endereço"};
@@ -1316,6 +1334,161 @@ function alRender(){
   $("#alb").innerHTML=rows.length?h:'<div class="empty">Nenhum registro encontrado.</div>';
   $("#alv").textContent=alResumo?"Ver todos os acessos":"Ver resumo por e-mail";
 }
+/* ---------- Backup do sistema (somente admin principal) ---------- */
+const BK_TAB=[
+ {t:"itens",ord:"id",key:"estoque,codigo"},
+ {t:"enderecos",ord:"id",key:"estoque,codigo,rua,endereco"},
+ {t:"importacoes",ord:"estoque",key:"estoque"},
+ {t:"consumo_saldos",ord:"codigo",key:"estoque,codigo"},
+ {t:"consumo_mov",ord:"id",key:"estoque,codigo,data,detalhe"},
+ {t:"consumo_cargas",ord:"id",vazio:1},
+ {t:"consumo_validade",ord:"id",vazio:1},
+ {t:"usuarios",ord:"email",key:"email"},
+ {t:"acesso_sistemas",ord:"email",key:"email,sistema"},
+ {t:"gestores_acesso",ord:"email",key:"email"},
+ {t:"admin_bloqueios",ord:"email",key:"email,sistema"},
+ {t:"admins",ord:"email",key:"email",soSql:1},
+ {t:"acessos",ord:"id",vazio:1,log:1}
+];
+const bkSt=m=>{$("#bkst").textContent=m};
+async function bkLer(d){let o=[];for(let a=0;;a+=1000){const {data,error}=await sb.from(d.t).select("*").order(d.ord,{ascending:true}).range(a,a+999);if(error)throw error;o=o.concat(data||[]);bkSt(`Lendo ${d.t}: ${o.length} registros…`);if(!data||data.length<1000)break}return o}
+function bkCsv(rows){if(!rows.length)return"";const cols=[...new Set(rows.flatMap(r=>Object.keys(r)))];const q=v=>{if(v==null)return"";v=typeof v==="object"?JSON.stringify(v):String(v);return /[";\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};return"﻿"+cols.join(";")+"\r\n"+rows.map(r=>cols.map(c=>q(r[c])).join(";")).join("\r\n")}
+const bkSq=v=>v==null?"null":"'"+String(v).replace(/'/g,"''")+"'";
+function bkSqlAcessos(D){
+  const L=["-- Restaura administradores e acessos. Rode no SQL Editor do Supabase (projeto novo, depois de rodar seguranca-supabase.sql).",""];
+  const ins=(t,cols,rows)=>{if(rows&&rows.length)L.push(`insert into public.${t} (${cols.join(",")}) values\n`+rows.map(r=>"  ("+cols.map(c=>bkSq(r[c])).join(",")+")").join(",\n")+"\non conflict do nothing;\n")};
+  ins("admins",["email"],D.admins);ins("gestores_acesso",["email"],D.gestores_acesso);ins("usuarios",["email","ultimo_acesso"],D.usuarios);ins("acesso_sistemas",["email","sistema"],D.acesso_sistemas);ins("admin_bloqueios",["email","sistema"],D.admin_bloqueios);
+  return L.join("\n")
+}
+function bkViewer(D,quando){
+  const dados={};["itens","enderecos","consumo_saldos","consumo_validade"].forEach(t=>{dados[t]=(D[t]||[]).map(r=>{const o={...r};delete o.imagem;return o})});
+  const js=JSON.stringify(dados).replace(/</g,"\\u003c");
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Consulta offline — Almoxarifado FUMEC</title>
+<style>body{font:14px system-ui,Arial;margin:0;background:#f5f6f8;color:#1b1f24}header{background:#0b5cab;color:#fff;padding:12px 16px}h1{font-size:17px;margin:0}main{padding:12px 16px}.bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}input,select{font:inherit;padding:8px 10px;border:1px solid #c9ced6;border-radius:8px}input{flex:1;min-width:200px}.w{overflow:auto;background:#fff;border:1px solid #dde1e7;border-radius:8px}table{border-collapse:collapse;width:100%}th,td{padding:6px 9px;border-bottom:1px solid #eceef2;text-align:left;white-space:nowrap}th{background:#eef1f5;position:sticky;top:0}.s{color:#667;font-size:12px;margin:6px 0}</style></head><body>
+<header><h1>Consulta offline — Sistemas do Almoxarifado (FUMEC)</h1><div style="font-size:12px;opacity:.9">Cópia somente leitura gerada em ${quando}. Não substitui o sistema: reflete os dados no momento do backup.</div></header>
+<main><div class="bar"><select id="t"><option value="itens">Itens (catálogos)</option><option value="enderecos">Endereçamento</option><option value="consumo_saldos">Saldos do relatório de consumo</option><option value="consumo_validade">Validades</option></select><input id="q" type="search" placeholder="Buscar por código, nome, rua, endereço…"></div><div class="s" id="c"></div><div class="w"><table id="tb"></table></div></main>
+<script>const D=${js};const $=s=>document.getElementById(s);
+function r(){const t=$("t").value,q=$("q").value.trim().toLowerCase(),rows=D[t]||[];const cols=[...new Set(rows.slice(0,200).flatMap(x=>Object.keys(x)))].filter(c=>c!=="id"&&c!=="criado_em");
+const f=q?rows.filter(x=>cols.some(c=>String(x[c]??"").toLowerCase().includes(q))):rows;const v=f.slice(0,500);
+$("c").textContent=f.length+" registro(s)"+(f.length>500?" — mostrando os 500 primeiros; refine a busca":"");
+$("tb").innerHTML="<thead><tr>"+cols.map(c=>"<th>"+c+"</th>").join("")+"</tr></thead><tbody>"+v.map(x=>"<tr>"+cols.map(c=>"<td>"+String(x[c]??"").replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]))+"</td>").join("")+"</tr>").join("")+"</tbody>"}
+$("t").onchange=r;$("q").oninput=r;r();<\/script></body></html>`
+}
+const BK_LEIA=q=>`BACKUP — SISTEMAS DO ALMOXARIFADO (FUMEC)
+Gerado em: ${q}
+
+CONTEÚDO
+  dados/*.json ........ todas as tabelas (usado para restaurar no sistema)
+  dados/*.csv ......... as mesmas tabelas para abrir no Excel (separador ;)
+  imagens/ ............ fotos dos itens (se marcadas no backup) + imagens.json
+  sistema/index.html .. cópia do sistema (mesma versão em uso no momento do backup)
+  consulta-offline.html  consulta simples (busca) que abre sem internet, só leitura
+  restaurar-acessos.sql  administradores, usuários e permissões (rode no SQL Editor)
+
+SE A VERCEL FOR BLOQUEADA (Supabase continua ok)
+  Publique sistema/index.html (e logo-fumec.png) em qualquer hospedagem estática
+  (Netlify, Cloudflare Pages, GitHub Pages, servidor da prefeitura). Se mudar o
+  endereço, inclua a nova URL em Supabase > Authentication > URL Configuration
+  e nas origens autorizadas do login Google.
+
+SE O SUPABASE FOR BLOQUEADO / PERDIDO
+  1. Crie um projeto novo no Supabase e rode, no SQL Editor, o guia de implantação
+     (criação das tabelas itens, importacoes etc.) e depois seguranca-supabase.sql.
+  2. Rode restaurar-acessos.sql (cria administradores e permissões).
+  3. Ative o login Google no projeto novo e crie o bucket público "imagens".
+  4. Em sistema/index.html, troque SUPABASE_URL e SUPABASE_KEY pelos do projeto novo
+     e publique o arquivo.
+  5. Entre como administrador principal > Backup do sistema > Restaurar, e escolha este .zip.
+     Marque "reenviar imagens" para recriar as fotos no novo projeto.
+
+SE OS DOIS FORAM BLOQUEADOS
+  Use consulta-offline.html para consultar itens e endereços e os CSV no Excel.
+
+GUARDE o arquivo seguranca-supabase.sql e o guia de implantação junto com este backup.
+Este arquivo contém dados internos e e-mails de usuários: guarde em local seguro.
+`;
+async function bkGerar(){
+  if(!isPrincipal())return;if(!window.JSZip)return toast("Biblioteca JSZip não carregou. Recarregue a página.",8000);
+  const btn=$("#bkgo");btn.disabled=true;
+  try{
+    const agora=new Date(),q=agora.toLocaleString("pt-BR"),stamp=agora.toISOString().slice(0,16).replace(/[-:T]/g,"");
+    const zip=new JSZip(),D={},aus=[],cont={};
+    for(const d of BK_TAB){
+      if(d.log&&!$("#bklog").checked)continue;
+      try{D[d.t]=await bkLer(d);cont[d.t]=D[d.t].length;zip.file(`dados/${d.t}.json`,JSON.stringify(D[d.t]));zip.file(`dados/${d.t}.csv`,bkCsv(D[d.t]))}
+      catch(e){aus.push(d.t+" ("+(e.message||e.code||e)+")")}
+    }
+    if(!D.itens)throw new Error("Não foi possível ler a tabela de itens.");
+    zip.file("restaurar-acessos.sql",bkSqlAcessos(D));zip.file("consulta-offline.html",bkViewer(D,q));
+    try{let h=await (await fetch(location.href.split("#")[0],{cache:"no-store"})).text();if(!/SUPABASE_URL/.test(h))throw 0;zip.file("sistema/index.html",h)}catch(e){zip.file("sistema/index.html","<!doctype html><meta charset=utf-8>"+document.documentElement.outerHTML)}
+    try{const lg=await fetch($("#plogo").src);if(lg.ok)zip.file("sistema/logo-fumec.png",await lg.blob())}catch(e){}
+    let nImg=0,errImg=0;
+    if($("#bkimg").checked){
+      const L=(D.itens||[]).filter(i=>/^https?:/.test(i.imagem||"")),mapa=[];let k=0;
+      const w=async()=>{while(k<L.length){const i=L[k++];try{const r=await fetch(i.imagem);if(!r.ok)throw 0;const base=decodeURIComponent(i.imagem.split("?")[0].split("/").pop()).replace(/[^A-Za-z0-9._-]/g,"_");const arq=`imagens/${i.estoque}_${String(i.codigo).replace(/[^A-Za-z0-9._-]/g,"_")}_${base}`;zip.file(arq,await r.blob());mapa.push({estoque:i.estoque,codigo:i.codigo,url:i.imagem,arquivo:arq});nImg++}catch(e){errImg++}bkSt(`Baixando imagens: ${nImg+errImg}/${L.length}…`)}};
+      await Promise.all(Array.from({length:6},w));zip.file("imagens/imagens.json",JSON.stringify(mapa))
+    }
+    zip.file("LEIA-ME.txt",BK_LEIA(q));zip.file("backup-info.json",JSON.stringify({gerado_em:agora.toISOString(),por:userEmail,versao:1,tabelas:cont,imagens:nImg,imagens_com_erro:errImg,ausentes:aus}));
+    bkSt("Compactando…");const blob=await zip.generateAsync({type:"blob",compression:"DEFLATE",compressionOptions:{level:6}});
+    const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`backup-almoxarifado-${stamp}.zip`;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},4000);
+    try{localStorage.setItem("bk_ult",q);localStorage.setItem("bk_iso",agora.toISOString())}catch(e){}bkUlt();bkAviso();
+    bkSt(`Backup gerado (${(blob.size/1048576).toFixed(1)} MB). ${Object.entries(cont).map(([t,n])=>t+": "+n).join(" · ")}${nImg?` · imagens: ${nImg}`:""}${errImg?` (${errImg} não baixadas)`:""}${aus.length?` · não encontradas: ${aus.join(", ")}`:""}`);
+    logAlt("backup_sistema",`Gerou backup (${(blob.size/1048576).toFixed(1)} MB)`);
+  }catch(e){bkSt("Falha ao gerar o backup: "+(e.message||e));toast("Falha ao gerar o backup.",7000)}
+  btn.disabled=false
+}
+async function bkRestaurar(){
+  if(!isPrincipal())return;const f=$("#bkfile").files[0];if(!f)return toast("Escolha o arquivo .zip do backup.",6000);if(!window.JSZip)return toast("Biblioteca JSZip não carregou.",7000);
+  if(!confirm("Restaurar os dados deste backup?\n\nRegistros com o mesmo código/chave serão SOBRESCRITOS pelos do backup. Nada é apagado. Para itens que existem hoje e não estão no backup, nada muda."))return;
+  const btn=$("#bkrest");btn.disabled=true;
+  try{
+    const z=await JSZip.loadAsync(f),info=z.file("backup-info.json")?JSON.parse(await z.file("backup-info.json").async("string")):null;
+    if(!info||!z.file("dados/itens.json"))throw new Error("Arquivo não parece ser um backup deste sistema.");
+    const rel=[];
+    for(const d of BK_TAB){
+      const fl=z.file(`dados/${d.t}.json`);if(!fl||d.soSql)continue;
+      let rows=JSON.parse(await fl.async("string"));if(!rows.length)continue;
+      rows=rows.map(r=>{const o={...r};delete o.id;return o});
+      if(d.vazio){const {count,error}=await sb.from(d.t).select("*",{count:"exact",head:true});if(error){rel.push(`${d.t}: erro (${error.message})`);continue}if(count>0){rel.push(`${d.t}: já tem dados, ignorado`);continue}}
+      let n=0;
+      for(let i=0;i<rows.length;i+=500){
+        const lote=rows.slice(i,i+500);
+        const {error}=d.key?await sb.from(d.t).upsert(lote,{onConflict:d.key}):await sb.from(d.t).insert(lote);
+        if(error){rel.push(`${d.t}: erro (${error.message||error.code})`);n=-1;break}
+        n+=lote.length;bkSt(`Restaurando ${d.t}: ${n}/${rows.length}…`)
+      }
+      if(n>=0)rel.push(`${d.t}: ${n}`)
+    }
+    if($("#bkrimg").checked&&z.file("imagens/imagens.json")){
+      const mapa=JSON.parse(await z.file("imagens/imagens.json").async("string"));let ok=0,er=0;
+      const ids=new Map();for(let a=0;;a+=1000){const {data}=await sb.from("itens").select("id,estoque,codigo").order("id").range(a,a+999);(data||[]).forEach(r=>ids.set(r.estoque+"|"+r.codigo,r.id));if(!data||data.length<1000)break}
+      for(const m of mapa){
+        try{const id=ids.get(m.estoque+"|"+m.codigo);if(!id)throw 0;const blob=await z.file(m.arquivo).async("blob");const path=`${id}/${Date.now()}-${m.arquivo.split("/").pop()}`;
+          const up=await sb.storage.from("imagens").upload(path,blob,{upsert:true,cacheControl:"31536000"});if(up.error)throw up.error;
+          const {data}=sb.storage.from("imagens").getPublicUrl(path);const {error}=await sb.from("itens").update({imagem:data.publicUrl}).eq("id",id);if(error)throw error;ok++}catch(e){er++}
+        bkSt(`Reenviando imagens: ${ok+er}/${mapa.length}…`)}
+      rel.push(`imagens reenviadas: ${ok}${er?` (${er} falharam)`:""}`)
+    }
+    bkSt("Restauração concluída — "+rel.join(" · ")+". Administradores/usuários: rode restaurar-acessos.sql no Supabase, se necessário.");
+    logAlt("backup_restaurado",`Restaurou backup de ${info.gerado_em||"?"}`);toast("Restauração concluída. Recarregue a página.",8000)
+  }catch(e){bkSt("Falha na restauração: "+(e.message||e));toast("Falha na restauração.",7000)}
+  btn.disabled=false
+}
+function bkUlt(){let u="";try{u=localStorage.getItem("bk_ult")||""}catch(e){}$("#bkult").textContent=u?"Último backup gerado neste navegador: "+u:"Nenhum backup gerado neste navegador ainda."}
+const BK_DIAS=7;
+async function bkAviso(){
+  const el=$("#bkaviso");if(!el)return;if(!isPrincipal()||preview||permErr){el.style.display="none";return}
+  let u=null;
+  try{const {data}=await sb.from("acessos").select("criado_em").eq("acao","backup_sistema").order("criado_em",{ascending:false}).range(0,0);if(data&&data[0])u=new Date(data[0].criado_em)}catch(e){}
+  try{const l=localStorage.getItem("bk_iso");if(l){const d=new Date(l);if(!u||d>u)u=d}}catch(e){}
+  const dias=u&&!isNaN(u)?Math.floor((Date.now()-u)/864e5):null;
+  if(dias!==null&&dias<BK_DIAS){el.style.display="none";return}
+  el.innerHTML="💾 <b>"+(dias===null?"Nenhum backup do sistema foi registrado ainda.":`O último backup foi há ${dias} dia(s).`)+"</b> Clique aqui para gerar um novo backup (recomendado a cada "+BK_DIAS+" dias).";el.style.display="block"
+}
+$("#bkaviso").onclick=()=>$("#tilebkp").click();
+$("#tilebkp").onclick=e=>{e.preventDefault();if(!isPrincipal()||preview)return;$("#bkst").textContent="";$("#bkfile").value="";bkUlt();$("#bk").classList.add("on")};
+$("#bkx").onclick=()=>$("#bk").classList.remove("on");$("#bkgo").onclick=bkGerar;$("#bkrest").onclick=bkRestaurar;
+
 /* ---------- Acessos de usuários ---------- */
 const SIST=[["consumo","Catálogo de Consumo"],["permanentes","Catálogo de Bens"],["enderecamento","Endereç. Consumo"],["enderecamento_bens","Endereç. Bens"],["relatorio","Relatório de Consumo"]];
 let uaUsers=new Map(),uaAdmins=new Set(),uaGest=new Set(),uaBlk=new Map();

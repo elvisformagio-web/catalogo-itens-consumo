@@ -856,7 +856,8 @@ function rRender(){
     case"itens":{const q=norm(RS.q);const vis=all.filter(c=>(!q||norm(c.P.cod+" "+c.P.desc+" "+(c.P.alt||"")).includes(q))&&(!RS.status||c.status===RS.status)&&(!RS.rec||c.mesesCons>=3)&&(!RS.mx||(c.abcV+"|"+c.xyz)===RS.mx)&&(!RS.par||(c.saldo>0&&c.diasSem>=RS.par)));h=rTabela(vis,per);break}
     default:h=rAbaGeral(X,A,V);
   }
-  box.innerHTML=h;rX=X;if(RS.aba==="unif")rWireUnif();if(RS.aba==="req")rWireReq();
+  box.innerHTML=h;rX=X;rEl("rq").style.display=RS.aba==="itens"?"":"none";  // busca só aparece onde é usada
+  if(RS.aba==="unif")rWireUnif();if(RS.aba==="req")rWireReq();
   const tp=rEl("rtop"),tb=rEl("rtbl");
   if(tp&&tb){const ajusta=()=>{tp.firstChild.style.width=tb.scrollWidth+"px";tp.style.display=tb.scrollWidth>tb.clientWidth+2?"":"none"};ajusta();
     let a=false;tp.onscroll=()=>{if(a){a=false;return}a=true;tb.scrollLeft=tp.scrollLeft};tb.onscroll=()=>{if(a){a=false;return}a=true;tp.scrollLeft=tb.scrollLeft};

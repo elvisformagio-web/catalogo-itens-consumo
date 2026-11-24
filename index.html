@@ -224,7 +224,7 @@ header #home,header #logbtn,header #pvbtn{background:transparent;color:#fff;bord
 <div id="rel" style="display:none"><div class="wrap">
 <header>
   <div class="lg"><img id="rlogo" alt="FUMEC"><div><h1>Relatório de Consumo</h1><div class="sub">FUMEC · indicadores de movimentação, consumo e autonomia dos almoxarifados</div></div></div>
-  <div class="ab"><button data-go="">⬅ Início</button><button id="rimpbtn" style="display:none">📥 Importar consumo</button><button id="rreqbtn" style="display:none">📋 Importar requisições</button><button id="rvalbtn" style="display:none">📅 Importar validades</button><button id="rmodval" style="display:none">Modelo de validades</button><button id="rexp">⬇ Exportar itens (CSV)</button><button id="rprint">🖨 Imprimir</button><button id="rref">⟳ Atualizar</button></div>
+  <div class="ab"><button data-go="">⬅ Início</button><button id="rimpbtn" style="display:none">📥 Importar consumo</button><button id="rreqbtn" style="display:none">📋 Importar requisições</button><button id="rvalbtn" style="display:none">📅 Importar validades</button><button id="rexp">⬇ Exportar itens (CSV)</button><button id="rprint">🖨 Imprimir</button><button id="rref">⟳ Atualizar</button></div>
 </header>
 <div id="rfil"><div class="rl-bar"><span class="rl-seg" id="rest"><button data-e="todos" class="on">Todos os almoxarifados</button><button data-e="central">Central</button><button data-e="ceprocamp">Ceprocamp</button></span>
   <select id="rper"></select> <label class="sub">de <input type="date" id="rde"></label> <label class="sub">até <input type="date" id="rate"></label>
@@ -340,7 +340,7 @@ SYSTEMS.enderecamento_bens={titulo:"Endereçamento de Bens Permanentes",est:SYST
 /* ================= Relatório de Consumo (dashboard) ================= */
 SYSTEMS.relatorio={titulo:"Relatório de Consumo",rel:true,est:[["central","Almoxarifado Central"],["ceprocamp","Almoxarifado Ceprocamp"]]};
 var REL=null,RLOAD=null; // dados carregados do banco
-const RS={corr:(()=>{try{return localStorage.getItem("r_corr")!=="0"}catch(e){return true}})(),unif:(()=>{try{return localStorage.getItem("r_unif")!=="0"}catch(e){return true}})(),par:0,aba:"geral",gran:"m",mx:"",licMeses:12,licMargem:10,est:"todos",preset:"12m",de:null,ate:null,q:"",status:"",sort:"valor",dir:-1,shown:100,top:"valor"};
+const RS={rec:false,corr:(()=>{try{return localStorage.getItem("r_corr")!=="0"}catch(e){return true}})(),unif:(()=>{try{return localStorage.getItem("r_unif")!=="0"}catch(e){return true}})(),par:0,aba:"geral",gran:"m",mx:"",licMeses:12,licMargem:10,est:"todos",preset:"12m",de:null,ate:null,q:"",status:"",sort:"valor",dir:-1,shown:100,top:"valor"};
 const RDAY=864e5, RNOMEST={central:"Almoxarifado Central",ceprocamp:"Almoxarifado Ceprocamp"};
 const rIso=ms=>new Date(ms).toISOString().slice(0,10);
 const rMs=iso=>{const [y,m,d]=String(iso).slice(0,10).split("-").map(Number);return Date.UTC(y,m-1,d)};
@@ -693,7 +693,7 @@ function rKPIs(A,V,X,S){
   const {per}=X,J=X.J;
   const meses12=rMonths(Math.max(J.a12,per.ini),per.ate);
   const dv=A.var3,cdv=dv==null?"":dv>0.1?"no":dv<-0.1?"ok":"";
-  const K=(t,v,s,ex)=>`<div class="rl-k${ex?" "+ex:""}"${ex&&ex.includes("clk")?` data-st="${ex.split(":")[1]||""}"`:""}><div class="kt">${t}</div><div class="kv">${v}</div><div class="ks">${s||""}</div></div>`;
+  const K=(t,v,s,ex)=>`<div class="rl-k${ex?" "+ex:""}"${ex&&ex.includes("clk")?` data-st="${ex.split(":")[1]||""}"${ex.includes(":rec")?' data-rec="1"':""}`:""}><div class="kt">${t}</div><div class="kv">${v}</div><div class="ks">${s||""}</div></div>`;
   const dias=m=>m==null?null:m*30.4375;
   const estMed=rEstMedio(X.all,per),mesesP=rMonths(Math.max(per.de,per.ini),per.ate);
   const giroP=estMed>0?A.liqV/estMed:null,giroA=giroP!=null&&mesesP>0?giroP*12/mesesP:null;
@@ -706,8 +706,8 @@ function rKPIs(A,V,X,S){
    K("Consumo médio mensal — 12m × 3m",`${rKR(A.mV12)} <span class="vs">×</span> ${rKR(A.mV3)}`,`3m vs 12m: <span class="rtag ${cdv||"gr"}">${rPct(dv)}</span> · no período: ${rKR(A.mVP)}/mês`)+
    K("Giro de estoque (consumo ÷ estoque médio)",giroP==null?"—":`${rN(giroP,2)}× <span class="vs">no período</span>`,`anualizado: <b>${giroA==null?"—":rN(giroA,2)+"×"}</b> · estoque médio ${rBRL(estMed)}`)+
    K("Cobertura de estoque (dias de consumo)",`${A.aut12==null?"—":rN(A.aut12*30.4375,0)} <span class="vs">×</span> ${A.aut3==null?"—":rN(A.aut3*30.4375,0)}`,`12m × 3m · autonomia ${rA(A.aut12)} × ${rA(A.aut3)} meses · no período: ${rA(A.autP)} meses`)+
-   K("Itens críticos / em ruptura",`${rN(A.critico)} <span class="vs">/</span> ${rN(A.ruptura)}`,"autonomia ≤ 1 mês ou saldo zero com consumo","clk:critico")+
-   K("Taxa de ruptura (demanda recorrente)",rec.length?rN(100*recRup/rec.length,1)+"%":"—",`${rN(recRup)} de ${rN(rec.length)} itens com consumo em ≥3 meses estão com saldo zero`,"clk:ruptura")+
+   K("Itens críticos / em ruptura",`<span data-st="critico" title="Ver itens críticos" style="text-decoration:underline dotted">${rN(A.critico)}</span> <span class="vs">/</span> <span data-st="ruptura" title="Ver itens em ruptura" style="text-decoration:underline dotted">${rN(A.ruptura)}</span>`,"clique em cada número para listar os itens · crítico: autonomia ≤ 1 mês · ruptura: saldo zero com consumo","clk:critico")+
+   K("Taxa de ruptura (demanda recorrente)",rec.length?rN(100*recRup/rec.length,1)+"%":"—",`${rN(recRup)} de ${rN(rec.length)} itens com consumo em ≥3 meses estão com saldo zero`,"clk:ruptura:rec")+
    K("Estoque parado",rBRL(A.paradoV),`${rN(A.parado)} itens com saldo e sem consumo (12m/3m)`,"clk:parado")+
    K("Excesso de estoque",rBRL(A.excessoV),`${rN(A.excesso)} itens acima de 12 meses de consumo`,"clk:excesso")+
    (V.tem?K("Vencimentos",`${rN(V.S.venc)} vencidos`,`≤30 dias: ${V.S.d30} · ≤60: ${V.S.d60} · ≤90: ${V.S.d90} · valor ≤90d: ${rBRL(V.S.v90)}`,V.S.venc||V.S.d30?"warn":""):K("Vencimentos","—",admin?"Importe a planilha de validades (botão acima).":"Sem planilha de validades importada."))+
@@ -853,7 +853,7 @@ function rRender(){
     case"unif":h=rAbaUnif(X);break;
     case"req":h=rAbaReq(X);break;
     case"falta":h=rAbaFalta(X);break;
-    case"itens":{const q=norm(RS.q);const vis=all.filter(c=>(!q||norm(c.P.cod+" "+c.P.desc+" "+(c.P.alt||"")).includes(q))&&(!RS.status||c.status===RS.status)&&(!RS.mx||(c.abcV+"|"+c.xyz)===RS.mx)&&(!RS.par||(c.saldo>0&&c.diasSem>=RS.par)));h=rTabela(vis,per);break}
+    case"itens":{const q=norm(RS.q);const vis=all.filter(c=>(!q||norm(c.P.cod+" "+c.P.desc+" "+(c.P.alt||"")).includes(q))&&(!RS.status||c.status===RS.status)&&(!RS.rec||c.mesesCons>=3)&&(!RS.mx||(c.abcV+"|"+c.xyz)===RS.mx)&&(!RS.par||(c.saldo>0&&c.diasSem>=RS.par)));h=rTabela(vis,per);break}
     default:h=rAbaGeral(X,A,V);
   }
   box.innerHTML=h;rX=X;if(RS.aba==="unif")rWireUnif();if(RS.aba==="req")rWireReq();
@@ -902,7 +902,7 @@ function rTabela(vis,per){
   const L=[...vis].sort(cmp),show=L.slice(0,RS.shown);
   const th=R_COLS.map(c=>`<th data-s="${c[0]}" class="${["est","cod","desc","status","abc","xyz"].includes(c[0])?"":"n"}" style="cursor:pointer">${c[1]}${RS.sort===c[0]?(RS.dir>0?" ▲":" ▼"):""}</th>`).join("");
   const tr=show.map(c=>{const st=R_ST[c.status];return`<tr><td>${c.P.est==="central"?"Central":"Ceprocamp"}</td><td>${esc(c.P.cod)}${c.P.cods&&c.P.cods.size>1?` <span class="rtag" style="background:#e8f0fb;color:#0b4a99" title="Códigos unificados neste item: ${esc([...c.P.cods].sort().join(", "))}">+${c.P.cods.size-1}</span>`:""}</td><td title="${esc(c.P.desc)}">${esc(c.P.desc)} <span class="sub">${esc(c.P.un)}</span></td><td class="n">${rN(c.saldo)}</td><td class="n">${rBRL(c.valor)}</td><td class="n">${rN(c.per.compraQ)}</td><td class="n">${rN(c.per.saiQ)}</td><td class="n">${rN(c.per.liqQ)}</td><td class="n">${rN(c.a12.mQ,1)}</td><td class="n">${rN(c.a3.mQ,1)}</td><td class="n">${rPct(c.var3)}</td><td class="n">${rA(c.aut12)}</td><td class="n">${rA(c.aut3)}</td><td class="n">${c.aRef==null?"—":rN(c.aRef*30.4375)}</td><td class="n" title="Contado desde ${rBr(c.refParado)} (o mais recente entre última saída, última compra e início do histórico)">${c.semSaidaTodo&&!c.vidaExata?"≥ ":""}${rN(c.diasSem)}</td><td class="n">${c.ult==null?"—":rBr(c.ult)}</td><td class="n">${c.ultC==null?"—":rBr(c.ultC)}</td><td>${c.abcV}</td><td>${c.xyz}</td><td><span class="rtag ${st[1]}">${st[0]}</span></td></tr>`}).join("");
-  return`<div class="rl-card" id="rtab"><h3>Itens <span class="sub">${rN(vis.length)} item(ns)${RS.status?" — situação: <b>"+R_ST[RS.status][0]+"</b> <a href='#' id='rlimpa'>limpar</a>":""}${RS.mx?" — matriz ABC|XYZ: <b>"+RS.mx+"</b> <a href='#' id='rlimpa'>limpar</a>":""}${RS.par?" — sem saída há ≥ <b>"+RS.par+" dias</b> <a href='#' id='rlimpa'>limpar</a>":""} · período ${rBr(per.de)} a ${rBr(per.ate)} · médias em unidades/mês</span></h3><div class="rl-topscroll" id="rtop" title="Role para os lados"><div></div></div><div class="rl-tbl" id="rtbl"><table class="rl-t"><thead><tr>${th}</tr></thead><tbody>${tr||'<tr><td colspan="20" class="sub">Nenhum item.</td></tr>'}</tbody></table></div>${L.length>show.length?`<div style="text-align:center;margin-top:10px"><button id="rmais">Mostrar mais (${rN(L.length-show.length)} restantes)</button></div>`:""}</div>`;
+  return`<div class="rl-card" id="rtab"><h3>Itens <span class="sub">${rN(vis.length)} item(ns)${RS.status?" — situação: <b>"+R_ST[RS.status][0]+"</b>"+(RS.rec?" · demanda recorrente (consumo em ≥3 meses)":"")+" <a href='#' id='rlimpa'>limpar</a>":""}${RS.mx?" — matriz ABC|XYZ: <b>"+RS.mx+"</b> <a href='#' id='rlimpa'>limpar</a>":""}${RS.par?" — sem saída há ≥ <b>"+RS.par+" dias</b> <a href='#' id='rlimpa'>limpar</a>":""} · período ${rBr(per.de)} a ${rBr(per.ate)} · médias em unidades/mês</span></h3><div class="rl-topscroll" id="rtop" title="Role para os lados"><div></div></div><div class="rl-tbl" id="rtbl"><table class="rl-t"><thead><tr>${th}</tr></thead><tbody>${tr||'<tr><td colspan="20" class="sub">Nenhum item.</td></tr>'}</tbody></table></div>${L.length>show.length?`<div style="text-align:center;margin-top:10px"><button id="rmais">Mostrar mais (${rN(L.length-show.length)} restantes)</button></div>`:""}</div>`;
 }
 
 /* ---------- aba: Unificação de itens ---------- */
@@ -1122,7 +1122,7 @@ async function rImportarVal(files){
 /* ---------- exportação e entrada na tela ---------- */
 function rCsv(){
   const X=rLista();if(!X)return;const q=norm(RS.q);
-  const L=X.all.filter(c=>(!q||norm(c.P.cod+" "+c.P.desc+" "+(c.P.alt||"")).includes(q))&&(!RS.status||c.status===RS.status));
+  const L=X.all.filter(c=>(!q||norm(c.P.cod+" "+c.P.desc+" "+(c.P.alt||"")).includes(q))&&(!RS.status||c.status===RS.status)&&(!RS.rec||c.mesesCons>=3));
   const f=v=>typeof v==="number"?String(Math.round(v*100)/100).replace(".",","):'"'+String(v??"").replace(/"/g,'""')+'"';
   const head=["Almoxarifado","Código","Descrição","Un","Saldo","Custo unit.","Valor estoque","Entradas (un)","Saídas (un)","Consumo líquido (un)","Consumo líquido (R$)","Média mensal 12m","Média mensal 3m","Δ 3m×12m","Autonomia 12m (meses)","Autonomia 3m (meses)","Última saída","Última compra","Situação"];
   const lines=[head.map(f).join(";")].concat(L.map(c=>[RNOMEST[c.P.est],c.P.cod,c.P.desc,c.P.un,c.saldo,c.P.custo,c.valor,c.per.compraQ,c.per.saiQ,c.per.liqQ,c.per.liqV,c.a12.mQ,c.a3.mQ,c.var3==null?"":Math.round(c.var3*1000)/10+"%",c.aut12==null?"":c.aut12,c.aut3==null?"":c.aut3,c.ult==null?"":rBr(c.ult),c.ultC==null?"":rBr(c.ultC),R_ST[c.status][0]].map(f).join(";")));
@@ -1130,7 +1130,7 @@ function rCsv(){
 }
 async function relEnter(force){
   rEl("rlogo").src=$("#plogo").src;
-  const adm=!!admin;["rimpbtn","rreqbtn","rvalbtn","rmodval"].forEach(i=>rEl(i).style.display=adm?"":"none");
+  const adm=!!admin;["rimpbtn","rreqbtn","rvalbtn"].forEach(i=>rEl(i).style.display=adm?"":"none");
   if(REL&&!force){rRender();return}
   rEl("rbody").innerHTML='<div class="empty">Carregando dados de consumo…</div>';
   try{await rCarregar()}catch(e){const m=String(e.message||e);rEl("rbody").innerHTML=`<div class="rl-card"><h3>Não foi possível carregar os dados</h3><div class="sub">${esc(m)}${/relation|does not exist|consumo_/.test(m)?"<br><br>Execute a <b>seção 18</b> do arquivo seguranca-supabase.sql no Supabase (SQL Editor) e atualize a página.":""}</div></div>`;return}
@@ -1143,7 +1143,6 @@ async function relEnter(force){
   rEl("rreqfile").onchange=e=>{const f=[...e.target.files];e.target.value="";if(f.length)rRotear(f)};
   rEl("rvalbtn").onclick=()=>rEl("rvalfile").click();
   rEl("rvalfile").onchange=e=>{const f=[...e.target.files];e.target.value="";if(f.length)rImportarVal(f)};
-  rEl("rmodval").onclick=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob(["﻿NOME_ALMOX;DT_VALIDADE;COD_REDUZIDO;DESCR_PRODUTO;NUM_LOTE;REGISTRO_LOTE;QT_TOTAL;NOME_FORNECEDOR;ID_ALMOX\r\nAlmoxarifado Central (FUMEC);31/12/2026;73660;TOALHA DE PAPEL - PACOTE 1000 FOLHAS;L12/2026;;40;NOME DO FORNECEDOR;389\r\n"],{type:"text/csv;charset=utf-8"}));a.download="modelo-validades.csv";document.body.appendChild(a);a.click();a.remove()};
   rEl("rimpc").onclick=()=>{RIMP=null;rEl("rimpm").classList.remove("on")};
   rEl("rimpok").onclick=rGravarImport;
   rEl("rimpb").addEventListener("input",e=>{const i=e.target.dataset.i;if(i!=null&&RIMP)RIMP[i][e.target.dataset.k]=e.target.value});
@@ -1159,10 +1158,10 @@ async function relEnter(force){
     const pr=e.target.closest("tr[data-par]");if(pr){RS.par=+pr.dataset.par;RS.status="";RS.mx="";RS.aba="itens";RS.shown=100;window.scrollTo(0,0);rRender();return}
     const tb=e.target.closest("button[data-a]");if(tb){RS.aba=tb.dataset.a;window.scrollTo(0,0);rRender();return}
     const mx=e.target.closest("[data-mx]");if(mx){RS.mx=RS.mx===mx.dataset.mx?"":mx.dataset.mx;RS.aba="itens";RS.shown=100;rRender();return}
-    const st=e.target.closest("[data-st]");if(st&&st.dataset.st){RS.status=RS.status===st.dataset.st?"":st.dataset.st;RS.aba="itens";RS.shown=100;rRender();window.scrollTo(0,0);return}
+    const st=e.target.closest("[data-st]");if(st&&st.dataset.st){RS.status=st.dataset.st;RS.rec=st.dataset.rec==="1";RS.par=0;RS.mx="";RS.q="";const qi=rEl("rq");if(qi)qi.value="";RS.aba="itens";RS.shown=100;rRender();window.scrollTo(0,0);return}
     const th=e.target.closest("th[data-s]");if(th){const s=th.dataset.s;if(RS.sort===s)RS.dir*=-1;else{RS.sort=s;RS.dir=["est","cod","desc","status","abc","xyz"].includes(s)?1:-1}rRender();return}
     if(e.target.id==="rmais"){RS.shown+=200;rRender();return}
-    if(e.target.id==="rlimpa"){e.preventDefault();RS.status="";RS.mx="";RS.par=0;rRender()}
+    if(e.target.id==="rlimpa"){e.preventDefault();RS.status="";RS.mx="";RS.par=0;RS.rec=false;rRender()}
   });
 })();
 

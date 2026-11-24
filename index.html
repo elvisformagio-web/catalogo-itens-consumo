@@ -1000,6 +1000,19 @@ function rWireReq(){const t=rEl("rcorr");if(t)t.onchange=e=>{RS.corr=e.target.ch
 
 /* ---------- importação do consumo ---------- */
 let RIMP=null;
+/* escolhe a importação certa pelo cabeçalho da planilha (movimentação x requisições), qualquer que seja o botão usado */
+async function rRotear(files){
+  if(!admin)return toast("Apenas administradores podem importar.",8000);
+  const mov=[],req=[];
+  try{
+    toast(`Identificando ${files.length} planilha(s)…`,60000);
+    for(const f of files){const rows=await lerPlanilha(f),h=(rows[0]||[]).map(norm);
+      if(h.includes("nomeunidade")&&h.includes("qtatendida"))req.push(f);else mov.push(f)}
+    toast("");$("#toast").style.display="none";
+  }catch(e){toast("Erro ao ler a planilha: "+(e.message||e),12000);return}
+  if(mov.length)await rImportar(mov);
+  if(req.length)await rImportarReq(req);
+}
 async function rImportar(files){
   if(!admin)return toast("Apenas administradores podem importar.",8000);
   try{
@@ -1083,9 +1096,9 @@ async function relEnter(force){
 }
 (function(){
   rEl("rimpbtn").onclick=()=>rEl("rfile").click();
-  rEl("rfile").onchange=e=>{const f=[...e.target.files];e.target.value="";if(f.length)rImportar(f)};
+  rEl("rfile").onchange=e=>{const f=[...e.target.files];e.target.value="";if(f.length)rRotear(f)};
   rEl("rreqbtn").onclick=()=>rEl("rreqfile").click();
-  rEl("rreqfile").onchange=e=>{const f=[...e.target.files];e.target.value="";if(f.length)rImportarReq(f)};
+  rEl("rreqfile").onchange=e=>{const f=[...e.target.files];e.target.value="";if(f.length)rRotear(f)};
   rEl("rvalbtn").onclick=()=>rEl("rvalfile").click();
   rEl("rvalfile").onchange=e=>{const f=[...e.target.files];e.target.value="";if(f.length)rImportarVal(f)};
   rEl("rmodval").onclick=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob(["﻿NOME_ALMOX;DT_VALIDADE;COD_REDUZIDO;DESCR_PRODUTO;NUM_LOTE;REGISTRO_LOTE;QT_TOTAL;NOME_FORNECEDOR;ID_ALMOX\r\nAlmoxarifado Central (FUMEC);31/12/2026;73660;TOALHA DE PAPEL - PACOTE 1000 FOLHAS;L12/2026;;40;NOME DO FORNECEDOR;389\r\n"],{type:"text/csv;charset=utf-8"}));a.download="modelo-validades.csv";document.body.appendChild(a);a.click();a.remove()};

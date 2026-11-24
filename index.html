@@ -686,7 +686,7 @@ function rPareto(pts,titulo){
   return`<svg viewBox="0 0 ${W} ${H}" class="rsvg" role="img" aria-label="${titulo}">${g}</svg>`;
 }
 const rCat=d=>{const w=String(d||"").split(/[\s\/\-,;:()]+/).map(x=>norm(x)).filter(x=>x.length>=3&&!/^\d+$/.test(x)&&!["para","com","sem","tipo","kit","uso"].includes(x));return w[0]||"outros"};
-function rAbas(){return[["geral","Visão geral"],["consumo","Consumo e sazonalidade"],["abc","Curva ABC / XYZ"],["custos","Custos e preços"],["estoque","Estoque parado e ruptura"],["almox","Entre almoxarifados"],["req","Requisições por unidade"],["unif","Unificação de itens"],["licit","Aquisições"],["audit","Auditoria"],["itens","Itens"]]}
+function rAbas(){return[["geral","Visão geral"],["consumo","Consumo e sazonalidade"],["abc","Curva ABC / XYZ"],["custos","Custos e preços"],["estoque","Estoque parado e ruptura"],["almox","Entre almoxarifados"],["req","Requisições por unidade"],["falta","Falta de saldo (pedidos errados)"],["unif","Unificação de itens"],["licit","Aquisições"],["audit","Auditoria"],["itens","Itens"]]}
 
 /* ---------- abas ---------- */
 function rKPIs(A,V,X,S){
@@ -852,6 +852,7 @@ function rRender(){
     case"audit":h=rAudit(X);break;
     case"unif":h=rAbaUnif(X);break;
     case"req":h=rAbaReq(X);break;
+    case"falta":h=rAbaFalta(X);break;
     case"itens":{const q=norm(RS.q);const vis=all.filter(c=>(!q||norm(c.P.cod+" "+c.P.desc+" "+(c.P.alt||"")).includes(q))&&(!RS.status||c.status===RS.status)&&(!RS.mx||(c.abcV+"|"+c.xyz)===RS.mx)&&(!RS.par||(c.saldo>0&&c.diasSem>=RS.par)));h=rTabela(vis,per);break}
     default:h=rAbaGeral(X,A,V);
   }
@@ -996,6 +997,47 @@ function rAbaReq(X){
   <div class="rl-card"><h3>Evolução por ano <span class="sub">(todo o histórico importado)</span></h3><div class="rl-tbl"><table class="rl-t"><thead><tr><th>Ano</th><th class="n">Linhas</th><th class="n">No almox. errado</th><th class="n">%</th><th class="n">Valor errado</th><th class="n">% do valor</th></tr></thead><tbody>${Y.map(o=>`<tr><td>${o.y}</td><td class="n">${rN(o.n)}</td><td class="n">${rN(o.w)}</td><td class="n">${pc(o.w,o.n)}</td><td class="n">${rBRL(o.vw)}</td><td class="n">${pc(o.vw,o.v)}</td></tr>`).join("")}</tbody></table></div></div>
   <div class="rl-card"><h3>Unidades que mais requisitam do almoxarifado errado <span class="sub">(40 primeiras do período)</span></h3>${U.length?`<div class="rl-tbl"><table class="rl-t"><thead><tr><th>Unidade</th><th>Deveria requisitar do</th><th class="n">Linhas</th><th class="n">No almox. errado</th><th class="n">%</th><th class="n">Valor errado</th></tr></thead><tbody>${U.map(o=>`<tr><td>${esc(o.un)}</td><td>${NM(o.prop)}</td><td class="n">${rN(o.n)}</td><td class="n">${rN(o.w)}</td><td class="n">${pc(o.w,o.n)}</td><td class="n">${rBRL(o.v)}</td></tr>`).join("")}</tbody></table></div>`:'<div class="sub">Nenhuma requisição fora do almoxarifado correto no período.</div>'}</div>
   <div class="rl-card"><h3>Itens mais requisitados do almoxarifado errado <span class="sub">(30 primeiros por valor, no período)</span></h3>${I.length?`<div class="rl-tbl"><table class="rl-t"><thead><tr><th>Código</th><th>Item</th><th>Atendido por</th><th class="n">Linhas</th><th class="n">Quantidade</th><th class="n">Valor</th></tr></thead><tbody>${I.map(o=>`<tr><td>${esc(o.cod)}</td><td title="${esc(o.desc)}" style="max-width:380px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(o.desc)}</td><td style="white-space:nowrap">${NM(o.est)} <span class="sub">(deveria: ${NM(o.est==="central"?"ceprocamp":"central")})</span></td><td class="n">${rN(o.n)}</td><td class="n">${rN(o.qa)}</td><td class="n">${rBRL(o.v)}</td></tr>`).join("")}</tbody></table></div>`:'<div class="sub">—</div>'}</div>`}
+/* ---------- aba: pedidos no almoxarifado errado × saldo do almoxarifado correto ---------- */
+function rCausa(q){
+  const cv=REL.cov[q.prop];if(!cv||q.t<cv.ini||q.t>cv.fim)return{c:"fora",s:null};
+  const P=REL.prods.get(q.prop+"|"+q.cod);
+  if(!P||!(P.qi>0||P.qf>0||P.movs.some(m=>!m.adj)))return{c:"nao",s:0};
+  const s=rSaldoEm(P,q.t-RDAY),need=Math.max(q.qa,q.qsol);
+  return{c:s<=0?"zero":(s<need?"insuf":"ok"),s}
+}
+function rAbaFalta(X){
+  const {per}=X,Q=(REL.req||[]);
+  if(!Q.length)return`<div class="rl-card"><h3>Falta de saldo nos pedidos do almoxarifado errado</h3><div class="sub">Importe as requisições (botão <b>Importar requisições</b>) para ver esta análise.</div></div>`;
+  const NM=e=>e==="ceprocamp"?"Ceprocamp":"Central",pc=(a,b)=>b?rN(100*a/b,1)+"%":"—",sum=(L,k)=>L.reduce((s,q)=>s+q[k],0);
+  const wrong=Q.filter(q=>q.est!==q.prop&&q.qa>0);for(const q of wrong)q.ca=rCausa(q);
+  const W=wrong.filter(q=>q.t>=per.de&&q.t<=per.ate);
+  const G=c=>W.filter(q=>q.ca.c===c),zero=G("zero"),insuf=G("insuf"),ok=G("ok"),nao=G("nao"),fora=G("fora"),falta=[...zero,...insuf],det=W.length-fora.length;
+  const K=(t,v,s)=>`<div class="rl-k"><div class="kt">${t}</div><div class="kv">${v}</div><div class="ks">${s||""}</div></div>`;
+  const kp=(t,L,sub)=>K(t,`${rN(L.length)} <span class="vs">(${pc(L.length,det)})</span>`,`${sub?sub+" · ":""}valor ${rBRL(sum(L,"va"))}`);
+  // por ano (todo o histórico com cobertura)
+  const by=new Map();for(const q of wrong){const y=new Date(q.t).getUTCFullYear();let o=by.get(y);if(!o){o={y,n:0,f:0,ok:0,nao:0,fora:0,vf:0};by.set(y,o)}o.n++;const c=q.ca.c;if(c==="zero"||c==="insuf"){o.f++;o.vf+=q.va}else if(c==="ok")o.ok++;else if(c==="nao")o.nao++;else o.fora++}
+  const Y=[...by.values()].sort((a,b)=>a.y-b.y);
+  // itens recorrentes por falta de saldo
+  const it=new Map();for(const q of falta){const k=q.prop+"|"+q.cod;let o=it.get(k);if(!o){o={k,prop:q.prop,cod:q.cod,desc:q.desc,n:0,zero:0,qt:0,v:0,ult:0,un:new Map(),sd:0};it.set(k,o)}o.n++;if(q.ca.c==="zero")o.zero++;o.qt+=Math.max(q.qa,q.qsol);o.v+=q.va;o.ult=Math.max(o.ult,q.t);o.sd+=q.ca.s;o.un.set(q.un,(o.un.get(q.un)||0)+1)}
+  const I=[...it.values()].sort((a,b)=>b.n-a.n||b.v-a.v).slice(0,40);
+  const hoje=o=>{const P=REL.prods.get(o.k);return P?rSaldoEm(P,per.ate):null};
+  // itens pedidos errado mesmo havendo saldo
+  const it2=new Map();for(const q of ok){const k=q.prop+"|"+q.cod;let o=it2.get(k);if(!o){o={prop:q.prop,cod:q.cod,desc:q.desc,n:0,v:0,sd:0};it2.set(k,o)}o.n++;o.v+=q.va;o.sd+=q.ca.s}
+  const I2=[...it2.values()].sort((a,b)=>b.v-a.v).slice(0,20);
+  // unidades × causa
+  const un=new Map();for(const q of W){let o=un.get(q.un);if(!o){o={un:q.un,prop:q.prop,n:0,f:0,ok:0,nao:0,fora:0,v:0};un.set(q.un,o)}o.n++;o.v+=q.va;const c=q.ca.c;if(c==="zero"||c==="insuf")o.f++;else if(c==="ok")o.ok++;else if(c==="nao")o.nao++;else o.fora++}
+  const U=[...un.values()].sort((a,b)=>b.n-a.n).slice(0,20);
+  const top=m=>{let b=null;for(const [k,v] of m)if(!b||v>b[1])b=[k,v];return b?b[0]:"—"};
+  const lg=`<div class="sub" style="margin-bottom:8px">Para cada requisição atendida no almoxarifado “errado” (unidade Ceprocamp pedindo ao Central, ou as demais ao Ceprocamp), o sistema reconstrói o <b>saldo do item no almoxarifado correto no dia anterior ao pedido</b> (saldo importado menos as movimentações posteriores) e compara com a quantidade pedida. Só é possível dentro do período importado do almoxarifado correto; fora dele a causa fica “indeterminada”.</div>`;
+  return`<div class="rl-card"><h3>Pedidos no almoxarifado errado × saldo do almoxarifado correto <span class="sub">— período ${rBr(per.de)} a ${rBr(per.ate)}</span></h3>${lg}
+  <div class="rl-kpis">${K("Pedidos no almox. errado",rN(W.length),`valor ${rBRL(sum(W,"va"))}`)}${kp("Por falta de saldo no almox. correto",falta,`${rN(zero.length)} sem nenhum saldo + ${rN(insuf.length)} saldo insuficiente`)}${kp("Havia saldo suficiente",ok,"pedido indevido")}${kp("Item não estocado no correto",nao,"sem registro lá")}${K("Causa indeterminada",rN(fora.length),"fora do período importado do almox. correto")}</div>
+  <div class="sub" style="margin-top:6px">Percentuais sobre os ${rN(det)} pedidos com causa determinável.</div></div>
+  <div class="rl-card"><h3>Evolução por ano <span class="sub">(todo o histórico das requisições)</span></h3><div class="rl-tbl"><table class="rl-t"><thead><tr><th>Ano</th><th class="n">Pedidos errados</th><th class="n">Por falta de saldo</th><th class="n">Havia saldo</th><th class="n">Item não estocado</th><th class="n">Indeterminada</th><th class="n">Valor por falta de saldo</th></tr></thead><tbody>${Y.map(o=>`<tr><td>${o.y}</td><td class="n">${rN(o.n)}</td><td class="n">${rN(o.f)}</td><td class="n">${rN(o.ok)}</td><td class="n">${rN(o.nao)}</td><td class="n">${rN(o.fora)}</td><td class="n">${rBRL(o.vf)}</td></tr>`).join("")}</tbody></table></div></div>
+  <div class="rl-card"><h3>Itens que faltaram no almoxarifado correto <span class="sub">(recorrência no período — candidatos a revisar estoque mínimo e compra)</span></h3>${I.length?`<div class="rl-tbl"><table class="rl-t"><thead><tr><th>Código</th><th>Item</th><th>Deveria vir do</th><th class="n">Pedidos</th><th class="n">Sem saldo</th><th class="n">Qtd pedida</th><th class="n">Saldo médio no dia</th><th class="n">Valor</th><th>Último pedido</th><th class="n">Saldo hoje</th><th>Quem mais pediu</th></tr></thead><tbody>${I.map(o=>{const h=hoje(o);return`<tr><td>${esc(o.cod)}</td><td title="${esc(o.desc)}" style="max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(o.desc)}</td><td>${NM(o.prop)}</td><td class="n">${rN(o.n)}</td><td class="n">${rN(o.zero)}</td><td class="n">${rN(o.qt)}</td><td class="n">${rN(o.sd/o.n,1)}</td><td class="n">${rBRL(o.v)}</td><td>${rBr(o.ult)}</td><td class="n">${h==null?"—":rN(h)}</td><td title="${esc(top(o.un))}" style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(top(o.un))}</td></tr>`}).join("")}</tbody></table></div>`:'<div class="sub">Nenhum pedido no almoxarifado errado por falta de saldo no período.</div>'}</div>
+  <div class="rl-card"><h3>Unidades × causa <span class="sub">(20 que mais pedem no almoxarifado errado)</span></h3>${U.length?`<div class="rl-tbl"><table class="rl-t"><thead><tr><th>Unidade</th><th>Deveria pedir ao</th><th class="n">Pedidos errados</th><th class="n">Por falta de saldo</th><th class="n">Havia saldo</th><th class="n">Item não estocado</th><th class="n">Indeterminada</th><th class="n">Valor</th></tr></thead><tbody>${U.map(o=>`<tr><td>${esc(o.un)}</td><td>${NM(o.prop)}</td><td class="n">${rN(o.n)}</td><td class="n">${rN(o.f)}</td><td class="n">${rN(o.ok)}</td><td class="n">${rN(o.nao)}</td><td class="n">${rN(o.fora)}</td><td class="n">${rBRL(o.v)}</td></tr>`).join("")}</tbody></table></div>`:'<div class="sub">—</div>'}</div>
+  <div class="rl-card"><h3>Pedidos no almoxarifado errado mesmo havendo saldo <span class="sub">(possível erro de procedimento — 20 itens de maior valor)</span></h3>${I2.length?`<div class="rl-tbl"><table class="rl-t"><thead><tr><th>Código</th><th>Item</th><th>Deveria vir do</th><th class="n">Pedidos</th><th class="n">Saldo médio no dia</th><th class="n">Valor</th></tr></thead><tbody>${I2.map(o=>`<tr><td>${esc(o.cod)}</td><td title="${esc(o.desc)}" style="max-width:380px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(o.desc)}</td><td>${NM(o.prop)}</td><td class="n">${rN(o.n)}</td><td class="n">${rN(o.sd/o.n,1)}</td><td class="n">${rBRL(o.v)}</td></tr>`).join("")}</tbody></table></div>`:'<div class="sub">—</div>'}</div>`
+}
+
 function rWireReq(){const t=rEl("rcorr");if(t)t.onchange=e=>{RS.corr=e.target.checked;try{localStorage.setItem("r_corr",RS.corr?"1":"0")}catch(_){}rMontar();rRender()}}
 
 /* ---------- importação do consumo ---------- */
